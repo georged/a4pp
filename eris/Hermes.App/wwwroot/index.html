@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hermes Callback Tester</title>
+  <style>
+    body { font-family: "IBM Plex Sans", "Segoe UI", sans-serif; margin: 0; background: #f4f7fb; color: #11283a; }
+    header { background: #12344a; color: #fff; padding: 14px 18px; }
+    main { padding: 18px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    section { background: #fff; border: 1px solid #d8e3ec; border-radius: 10px; padding: 14px; }
+    label { display: block; font-size: 13px; color: #4f6575; margin-bottom: 4px; }
+    input, button { width: 100%; box-sizing: border-box; padding: 9px; border-radius: 8px; border: 1px solid #d8e3ec; margin-bottom: 8px; }
+    button { background: #0f8f7a; color: #fff; border: 0; cursor: pointer; font-weight: 600; }
+    pre { background: #0f1f2b; color: #d9edf8; padding: 10px; border-radius: 8px; max-height: 300px; overflow: auto; }
+    .muted { color: #5f7484; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hermes</h1>
+    <div class="muted">Callback receiver for testing Eris webhooks</div>
+  </header>
+  <main>
+    <section>
+      <h2>Behavior</h2>
+      <label>Drop percent (0-100)</label>
+      <input id="dropPercent" type="number" min="0" max="100" value="0" />
+      <label>Fail percent (0-100)</label>
+      <input id="failPercent" type="number" min="0" max="100" value="0" />
+      <button id="saveConfig">Save Behavior</button>
+      <div id="configMsg" class="muted"></div>
+    </section>
+
+    <section>
+      <h2>Register With Eris</h2>
+      <label>Eris base URL</label>
+      <input id="erisBaseUrl" placeholder="http://localhost:5158" />
+      <label>Webhook name</label>
+      <input id="webhookName" value="Hermes Receiver" />
+      <label>Spiritual animal (API key) (optional)</label>
+      <input id="studentKey" placeholder="animal-name" />
+      <button id="register">Register Webhook In Eris</button>
+      <div id="registerMsg" class="muted"></div>
+    </section>
+
+    <section style="grid-column: 1 / -1;">
+      <h2>Received Events</h2>
+      <button id="refresh">Refresh</button>
+      <pre id="events"></pre>
+    </section>
+  </main>
+
+  <script>
+    async function api(path, opts) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...opts
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      return text ? JSON.parse(text) : null;
+    }
+
+    async function loadConfig() {
+      const cfg = await api('/api/config');
+      document.getElementById('dropPercent').value = cfg.dropPercent;
+      document.getElementById('failPercent').value = cfg.failPercent;
+    }
+
+    async function loadEvents() {
+      const events = await api('/api/events');
+      document.getElementById('events').textContent = JSON.stringify(events, null, 2);
+    }
+
+    document.getElementById('saveConfig').addEventListener('click', async () => {
+      try {
+        await api('/api/config', {
+          method: 'POST',
+          body: JSON.stringify({
+            dropPercent: Number(document.getElementById('dropPercent').value),
+            failPercent: Number(document.getElementById('failPercent').value)
+          })
+        });
+        document.getElementById('configMsg').textContent = 'Saved';
+      } catch (e) {
+        document.getElementById('configMsg').textContent = e.message;
+      }
+    });
+
+    document.getElementById('register').addEventListener('click', async () => {
+      try {
+        const result = await api('/api/register-with-eris', {
+          method: 'POST',
+          body: JSON.stringify({
+            erisBaseUrl: document.getElementById('erisBaseUrl').value,
+            name: document.getElementById('webhookName').value,
+            studentKey: document.getElementById('studentKey').value
+          })
+        });
+        document.getElementById('registerMsg').textContent = `Registered: ${result.id}`;
+      } catch (e) {
+        document.getElementById('registerMsg').textContent = e.message;
+      }
+    });
+
+    document.getElementById('refresh').addEventListener('click', loadEvents);
+
+    loadConfig();
+    loadEvents();
+    setInterval(loadEvents, 3000);
+  </script>
+</body>
+</html>

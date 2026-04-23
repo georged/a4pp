@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eris Simulator</title>
+  <style>
+    :root {
+      --bg: #0e1a24;
+      --bg-card: #122636;
+      --text: #e8f0f7;
+      --muted: #8da3b5;
+      --accent: #00c2a8;
+      --danger: #ff6b6b;
+      --ok: #38d39f;
+      --border: #214158;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top right, #173145 0%, var(--bg) 55%);
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 { margin-top: 0; letter-spacing: 0.4px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: linear-gradient(180deg, #153246, var(--bg-card));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    label { display: block; margin: 8px 0 4px; color: var(--muted); }
+    input, select, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0c1f2d;
+      color: var(--text);
+    }
+    button {
+      background: var(--accent);
+      color: #032922;
+      border: 0;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .metric {
+      background: #0d2230;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .value { font-size: 1.2rem; font-weight: 700; }
+    .ok { color: var(--ok); }
+    .danger { color: var(--danger); }
+    #history {
+      max-height: 260px;
+      overflow: auto;
+      font-size: 12px;
+      white-space: pre-wrap;
+      background: #08141d;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 10px;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Eris Registration Burst Simulator</h1>
+  <div class="grid">
+    <section class="card">
+      <h2>Register Endpoint</h2>
+      <label>Name</label>
+      <input id="regName" placeholder="Team A - Power Automate" />
+      <label>Endpoint URL</label>
+      <input id="regUrl" placeholder="https://..." />
+      <label>Description</label>
+      <textarea id="regDesc" rows="2"></textarea>
+      <button id="registerBtn">Register</button>
+    </section>
+
+    <section class="card">
+      <h2>Run Simulation</h2>
+      <label>Registration</label>
+      <select id="registrationSelect"></select>
+      <label>Scenario</label>
+      <select id="scenario">
+        <option value="single-valid">Send 1 valid event</option>
+        <option value="burst">Send burst (configurable count)</option>
+        <option value="duplicates">Send duplicates</option>
+        <option value="invalid">Send N invalid events</option>
+        <option value="mixed">Send mixed batch</option>
+        <option value="replay-last-200">Replay last 200</option>
+      </select>
+
+      <div class="row">
+        <div>
+          <label>Count</label>
+          <input id="count" type="number" min="1" value="10" />
+        </div>
+        <div>
+          <label>Mode</label>
+          <select id="mode">
+            <option value="parallel">Parallel</option>
+            <option value="sequential">Sequential</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Rate/sec (sequential)</label>
+          <input id="rate" type="number" min="1" value="10" />
+        </div>
+        <div>
+          <label>Mixed: Valid</label>
+          <input id="validCount" type="number" min="0" value="20" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Mixed: Invalid</label>
+          <input id="invalidCount" type="number" min="0" value="5" />
+        </div>
+        <div>
+          <label>Mixed: Duplicates</label>
+          <input id="duplicateCount" type="number" min="0" value="5" />
+        </div>
+      </div>
+
+      <button id="runBtn">Start Simulation</button>
+
+      <div class="stats">
+        <div class="metric"><div>Sent</div><div id="sent" class="value">0</div></div>
+        <div class="metric"><div>Succeeded</div><div id="succeeded" class="value ok">0</div></div>
+        <div class="metric"><div>Failed</div><div id="failed" class="value danger">0</div></div>
+        <div class="metric"><div>Failure Rate</div><div id="failureRate" class="value">0.00%</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Recent Delivery History</h2>
+      <button id="loadHistoryBtn">Load Last 200</button>
+      <div id="history"></div>
+    </section>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script>
+    const registrationSelect = document.getElementById('registrationSelect');
+    let connection;
+
+    async function api(path, options) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      if (res.status === 204) return null;
+      return await res.json();
+    }
+
+    async function loadRegistrations() {
+      const regs = await api('/api/registrations');
+      registrationSelect.innerHTML = '';
+      for (const r of regs) {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = `${r.name} -> ${r.endpointUrl}`;
+        registrationSelect.appendChild(opt);
+      }
+    }
+
+    async function connectRun(runId) {
+      if (connection) {
+        await connection.stop();
+      }
+
+      connection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/simulation')
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on('progress', p => {
+        document.getElementById('sent').textContent = p.sent;
+        document.getElementById('succeeded').textContent = p.succeeded;
+        document.getElementById('failed').textContent = p.failed;
+        document.getElementById('failureRate').textContent = `${p.failureRate.toFixed(2)}%`;
+      });
+
+      connection.on('completed', summary => {
+        document.getElementById('failureRate').textContent = `${summary.failureRate.toFixed(2)}%`;
+      });
+
+      await connection.start();
+      await connection.invoke('JoinSimulation', runId);
+    }
+
+    document.getElementById('registerBtn').addEventListener('click', async () => {
+      try {
+        await api('/api/registrations', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: document.getElementById('regName').value,
+            endpointUrl: document.getElementById('regUrl').value,
+            description: document.getElementById('regDesc').value
+          })
+        });
+        await loadRegistrations();
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+
+    document.getElementById('runBtn').addEventListener('click', async () => {
+      try {
+        const regId = registrationSelect.value;
+        const req = {
+          scenario: document.getElementById('scenario').value,
+          count: parseInt(document.getElementById('count').value, 10),
+          mode: document.getElementById('mode').value,
+          ratePerSecond: parseInt(document.getElementById('rate').value, 10),
+          validCount: parseInt(document.getElementById('validCount').value, 10),
+          invalidCount: parseInt(document.getElementById('invalidCount').value, 10),
+          duplicateCount: parseInt(document.getElementById('duplicateCount').value, 10)
+        };
+
+        const result = await api(`/api/registrations/${regId}/simulate`, {
+          method: 'POST',
+          body: JSON.stringify(req)
+        });
+        await connectRun(result.runId);
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+
+    document.getElementById('loadHistoryBtn').addEventListener('click', async () => {
+      try {
+        const regId = registrationSelect.value;
+        const history = await api(`/api/registrations/${regId}/history`);
+        document.getElementById('history').textContent = history
+          .map(x => `${x.sentAtUtc} | ${x.statusCode ?? 'ERR'} | ${x.isSuccess ? 'OK' : 'FAIL'}\n${x.payloadJson}\n`)
+          .join('\n');
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+
+    loadRegistrations();
+  </script>
+</body>
+</html>

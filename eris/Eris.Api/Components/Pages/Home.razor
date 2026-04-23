@@ -1,0 +1,352 @@
+@page "/"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Eris Student</PageTitle>
+
+<h1>Student Simulator</h1>
+<p class="muted">Your registrations are isolated by your browser session key. Programmatic clients can use header <code>X-Eris-Student-Key</code>.</p>
+<p><strong>Your spiritual animal (API key):</strong> @studentKey</p>
+
+<div class="panel-grid">
+    <section class="panel">
+        <h2>Registered Webhooks</h2>
+        <div class="field-grid" style="grid-template-columns: 2fr 3fr auto; align-items: end;">
+            <div class="field">
+                <label>Name</label>
+                <InputText @bind-Value="createRequest.Name" class="@NameInputClass" />
+            </div>
+            <div class="field">
+                <label>Endpoint URL</label>
+                <InputText @bind-Value="createRequest.EndpointUrl" class="@UrlInputClass" />
+            </div>
+            <div class="field">
+                <button @onclick="CreateRegistrationAsync">Add</button>
+            </div>
+        </div>
+
+        @if (showAddValidation && (NameMissing || UrlMissing))
+        {
+            <p class="validation-hint">Name and Endpoint URL are required.</p>
+        }
+
+        <table class="table" style="margin-top: 10px;">
+            <thead>
+                <tr>
+                    <th class="col-select"></th>
+                    <th class="col-name">Name</th>
+                    <th class="col-endpoint">Endpoint</th>
+                    <th class="col-actions"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (registrations.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" class="muted">No webhooks registered yet.</td>
+                    </tr>
+                }
+                @foreach (var item in registrations)
+                {
+                    <tr>
+                        <td class="col-select">
+                            <input type="radio" name="destination" checked="@(SelectedRegistrationId == item.Id)" @onchange="() => SelectDestination(item.Id)" />
+                        </td>
+                        <td class="col-name">@item.Name</td>
+                        <td class="col-endpoint endpoint-value">@item.EndpointUrl</td>
+                        <td class="col-actions"><button @onclick="() => DeleteRegistrationAsync(item.Id)">Deregister</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel">
+        <h2>Send Data</h2>
+        <div class="field-grid">
+            <div class="field"><label>Valid</label><input type="number" min="0" @bind="request.ValidCount" /></div>
+            <div class="field"><label>Invalid</label><input type="number" min="0" @bind="request.InvalidCount" /></div>
+            <div class="field"><label>Duplicates</label><input type="number" min="0" @bind="request.DuplicateCount" /></div>
+            <div class="field"><label>Total</label><input type="number" value="@TotalToSend" readonly /></div>
+            <div class="field"><label>Mode</label><select @bind="request.Mode"><option value="parallel">Parallel</option><option value="sequential">Sequential</option></select></div>
+            @if (IsSequentialMode)
+            {
+                <div class="field"><label>Rate/sec</label><input type="number" min="1" @bind="request.RatePerSecond" /></div>
+            }
+        </div>
+
+        <button type="button" @onclick="StartSimulationAsync" disabled="@(!CanSend)">Send Data</button>
+    </section>
+
+    <section class="panel">
+        <h2>Run Stats</h2>
+        @if (isRunning)
+        {
+            <div class="run-indicator" role="status" aria-live="polite">
+                <span class="run-spinner" aria-hidden="true"></span>
+                <div>
+                    <strong>Sending in progress...</strong>
+                    <div class="muted">Processed @ProcessedCount of @plannedRequestCount, pending @PendingCount. Elapsed @ElapsedText.</div>
+                </div>
+            </div>
+        }
+
+        <div class="metrics">
+            <div><span>Sent</span><strong>@progress.Sent</strong></div>
+            <div><span>Succeeded</span><strong>@progress.Succeeded</strong></div>
+            <div><span>Failed</span><strong>@progress.Failed</strong></div>
+            <div><span>Failure Rate</span><strong>@progress.FailureRate.ToString("0.00")%</strong></div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private readonly CreateRegistrationRequest createRequest = new();
+    private readonly StartSimulationRequest request = new();
+    private List<RegistrationEndpoint> registrations = [];
+    private SimulationProgress progress = new();
+    private HubConnection? hubConnection;
+    private bool isRunning;
+    private string studentKey = string.Empty;
+    private bool initialized;
+    private bool showAddValidation;
+    private DateTime? runStartedAtUtc;
+    private int plannedRequestCount;
+    private CancellationTokenSource? statusTickerCts;
+
+    private Guid SelectedRegistrationId => Guid.TryParse(selectedRegistrationIdString, out var id) ? id : Guid.Empty;
+    private string selectedRegistrationIdString = string.Empty;
+    private bool IsSequentialMode => string.Equals(request.Mode, "sequential", StringComparison.OrdinalIgnoreCase);
+    private int TotalToSend => Math.Max(0, request.ValidCount) + Math.Max(0, request.InvalidCount) + Math.Max(0, request.DuplicateCount);
+    private bool CanSend => !isRunning && SelectedRegistrationId != Guid.Empty && TotalToSend > 0;
+    private bool NameMissing => showAddValidation && string.IsNullOrWhiteSpace(createRequest.Name);
+    private bool UrlMissing => showAddValidation && string.IsNullOrWhiteSpace(createRequest.EndpointUrl);
+    private string NameInputClass => NameMissing ? "input-invalid" : string.Empty;
+    private string UrlInputClass => UrlMissing ? "input-invalid" : string.Empty;
+    private int ProcessedCount => Math.Max(0, progress.Sent);
+    private int PendingCount => Math.Max(0, plannedRequestCount - ProcessedCount);
+    private string ElapsedText => runStartedAtUtc is null
+        ? "0s"
+        : $"{Math.Max(0, (int)(DateTime.UtcNow - runStartedAtUtc.Value).TotalSeconds)}s";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || initialized)
+        {
+            return;
+        }
+
+        initialized = true;
+        studentKey = await JS.InvokeAsync<string>("erisStudentKey.getOrCreate");
+        await EnsureStudentKeyAsync();
+        await LoadRegistrationsAsync();
+        if (registrations.Count > 0)
+        {
+            selectedRegistrationIdString = registrations[0].Id.ToString();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task EnsureStudentKeyAsync()
+    {
+        var me = await GetJsonAsync<Dictionary<string, string>>("/api/me");
+        if (me is not null && me.TryGetValue("studentKey", out var value) && !string.IsNullOrWhiteSpace(value))
+        {
+            studentKey = value;
+            await JS.InvokeVoidAsync("erisStudentKey.set", value);
+        }
+    }
+
+    private async Task<T?> GetJsonAsync<T>(string url)
+    {
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+        using var response = await Http.SendAsync(requestMessage);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<T>();
+    }
+
+    private async Task<HttpResponseMessage> PostJsonAsync<T>(string url, T payload)
+    {
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(payload)
+        };
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+        var response = await Http.SendAsync(requestMessage);
+        response.EnsureSuccessStatusCode();
+        return response;
+    }
+
+    private async Task LoadRegistrationsAsync()
+    {
+        registrations = await GetJsonAsync<List<RegistrationEndpoint>>("/api/registrations") ?? [];
+        if (registrations.Count > 0 && string.IsNullOrWhiteSpace(selectedRegistrationIdString))
+        {
+            selectedRegistrationIdString = registrations[0].Id.ToString();
+        }
+    }
+
+    private async Task CreateRegistrationAsync()
+    {
+        showAddValidation = true;
+
+        if (string.IsNullOrWhiteSpace(createRequest.Name) || string.IsNullOrWhiteSpace(createRequest.EndpointUrl))
+        {
+            return;
+        }
+
+        await PostJsonAsync("/api/registrations", createRequest);
+        createRequest.Name = string.Empty;
+        createRequest.EndpointUrl = string.Empty;
+        showAddValidation = false;
+        await LoadRegistrationsAsync();
+
+        if (SelectedRegistrationId == Guid.Empty && registrations.Count > 0)
+        {
+            selectedRegistrationIdString = registrations[0].Id.ToString();
+        }
+    }
+
+    private async Task StartSimulationAsync()
+    {
+        // Add-webhook validation should not appear during send flow.
+        showAddValidation = false;
+
+        if (SelectedRegistrationId == Guid.Empty || string.IsNullOrWhiteSpace(studentKey))
+        {
+            return;
+        }
+
+        request.Scenario = "mixed";
+        request.Count = TotalToSend;
+        plannedRequestCount = TotalToSend;
+
+        var response = await PostJsonAsync($"/api/registrations/{SelectedRegistrationId}/simulate", request);
+        var payload = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        if (payload is null || !payload.TryGetValue("runId", out var runIdText) || !Guid.TryParse(runIdText, out var runId))
+        {
+            return;
+        }
+
+        await ConnectSimulationAsync(runId);
+    }
+
+    private async Task ConnectSimulationAsync(Guid runId)
+    {
+        isRunning = true;
+        progress = new SimulationProgress();
+        runStartedAtUtc = DateTime.UtcNow;
+        StartStatusTicker();
+        await InvokeAsync(StateHasChanged);
+
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/simulation"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<SimulationProgress>("progress", value =>
+        {
+            progress = value;
+            isRunning = value.IsRunning;
+            if (!isRunning)
+            {
+                StopStatusTicker();
+            }
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<Dictionary<string, object>>("completed", _ =>
+        {
+            isRunning = false;
+            StopStatusTicker();
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("JoinSimulation", runId.ToString());
+    }
+
+    private async Task DeleteRegistrationAsync(Guid id)
+    {
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/registrations/{id}");
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+        using var response = await Http.SendAsync(requestMessage);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        await LoadRegistrationsAsync();
+
+        if (SelectedRegistrationId == id)
+        {
+            selectedRegistrationIdString = registrations.Count > 0 ? registrations[0].Id.ToString() : string.Empty;
+        }
+    }
+
+    private void SelectDestination(Guid id)
+    {
+        showAddValidation = false;
+        selectedRegistrationIdString = id.ToString();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        StopStatusTicker();
+
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+    private void StartStatusTicker()
+    {
+        StopStatusTicker();
+        statusTickerCts = new CancellationTokenSource();
+        _ = RunStatusTickerAsync(statusTickerCts.Token);
+    }
+
+    private void StopStatusTicker()
+    {
+        if (statusTickerCts is null)
+        {
+            return;
+        }
+
+        statusTickerCts.Cancel();
+        statusTickerCts.Dispose();
+        statusTickerCts = null;
+    }
+
+    private async Task RunStatusTickerAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                if (!isRunning)
+                {
+                    break;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+}

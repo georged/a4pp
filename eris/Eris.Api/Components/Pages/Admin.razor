@@ -1,0 +1,202 @@
+@page "/admin"
+@rendermode InteractiveServer
+@inject HttpClient Http
+
+<PageTitle>Eris Admin</PageTitle>
+
+<h1>Admin Console</h1>
+<p class="muted">Global registrations across all students. Protected by admin key.</p>
+
+@if (!authorized)
+{
+    <div class="panel" style="max-width: 560px;">
+        <h2>Unlock Admin Panel</h2>
+        <p class="muted">Set <code>Admin:Key</code> in appsettings and enter the same key here.</p>
+        <div class="field">
+            <label>Admin key</label>
+            <input type="password" @bind="adminKey" />
+        </div>
+        <button @onclick="ValidateKeyAsync">Unlock</button>
+        @if (!string.IsNullOrWhiteSpace(authMessage))
+        {
+            <p class="muted">@authMessage</p>
+        }
+    </div>
+}
+else
+{
+    <div class="panel" style="margin-bottom: 12px;">
+        <button @onclick="LoadAsync">Refresh</button>
+        <button @onclick="DeleteSelectedAsync" disabled="@(selectedIds.Count == 0)">Delete Selected (@selectedIds.Count)</button>
+        <button @onclick="Lock">Lock</button>
+    </div>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Name</th>
+                <th>Owner Key</th>
+                <th>Endpoint</th>
+                <th>Total</th>
+                <th>Failed</th>
+                <th>Failure Rate</th>
+                <th>Runs</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in rows)
+            {
+                <tr>
+                    <td><input type="checkbox" checked="@selectedIds.Contains(row.Id)" @onchange="@(e => ToggleSelection(row.Id, e.Value is true))" /></td>
+                    <td>@row.Name</td>
+                    <td>@row.OwnerKey</td>
+                    <td>@row.EndpointUrl</td>
+                    <td>@row.Total</td>
+                    <td>@row.Failed</td>
+                    <td>@row.FailureRate.ToString("0.00")%</td>
+                    <td>@row.Runs.Count</td>
+                    <td><button @onclick="() => DeleteAsync(row.Id)">Delete</button></td>
+                </tr>
+                @if (row.Runs.Count > 0)
+                {
+                    <tr>
+                        <td></td>
+                        <td colspan="9">
+                            <strong>Run statistics</strong>
+                            <table class="table" style="margin-top: 6px;">
+                                <thead>
+                                    <tr>
+                                        <th>Run Id</th>
+                                        <th>Scenario</th>
+                                        <th>Started</th>
+                                        <th>Completed</th>
+                                        <th>Total</th>
+                                        <th>Succeeded</th>
+                                        <th>Failed</th>
+                                        <th>Failure Rate</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var run in row.Runs)
+                                    {
+                                        <tr>
+                                            <td>@run.RunId</td>
+                                            <td>@run.Scenario</td>
+                                            <td>@run.StartedAtUtc.ToLocalTime().ToString("u")</td>
+                                            <td>@(run.CompletedAtUtc?.ToLocalTime().ToString("u") ?? "-")</td>
+                                            <td>@run.Total</td>
+                                            <td>@run.Succeeded</td>
+                                            <td>@run.Failed</td>
+                                            <td>@run.FailureRate.ToString("0.00")%</td>
+                                            <td>@(run.IsRunning ? "Running" : "Completed")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<AdminRegistrationDetails> rows = [];
+    private HashSet<Guid> selectedIds = [];
+    private string adminKey = string.Empty;
+    private bool authorized;
+    private string authMessage = string.Empty;
+
+    protected override Task OnInitializedAsync() => Task.CompletedTask;
+
+    private async Task ValidateKeyAsync()
+    {
+        authMessage = string.Empty;
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/auth/validate");
+        request.Headers.Add("X-Eris-Admin-Key", adminKey);
+
+        var response = await Http.SendAsync(request);
+        if (response.IsSuccessStatusCode)
+        {
+            authorized = true;
+            await LoadAsync();
+            return;
+        }
+
+        authorized = false;
+        authMessage = "Invalid key.";
+    }
+
+    private async Task LoadAsync()
+    {
+        if (!authorized)
+        {
+            return;
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/admin/registrations");
+        request.Headers.Add("X-Eris-Admin-Key", adminKey);
+        var response = await Http.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        rows = await response.Content.ReadFromJsonAsync<List<AdminRegistrationDetails>>() ?? [];
+
+        selectedIds.RemoveWhere(id => rows.All(x => x.Id != id));
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/admin/registrations/{id}");
+        request.Headers.Add("X-Eris-Admin-Key", adminKey);
+        var response = await Http.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        selectedIds.Remove(id);
+        await LoadAsync();
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/registrations/bulk-delete")
+        {
+            Content = JsonContent.Create(new BulkDeleteWebhooksRequest
+            {
+                RegistrationIds = selectedIds.ToList()
+            })
+        };
+        request.Headers.Add("X-Eris-Admin-Key", adminKey);
+
+        var response = await Http.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        selectedIds.Clear();
+        await LoadAsync();
+    }
+
+    private void ToggleSelection(Guid id, bool isSelected)
+    {
+        if (isSelected)
+        {
+            selectedIds.Add(id);
+        }
+        else
+        {
+            selectedIds.Remove(id);
+        }
+    }
+
+    private void Lock()
+    {
+        authorized = false;
+        rows = [];
+        selectedIds.Clear();
+        authMessage = string.Empty;
+    }
+}

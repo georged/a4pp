@@ -1,0 +1,2 @@
+[0] ERROR: Exception in Command Processing for EventSource Dotnet-dev-certs: Event WslWindowsTrustSucceeded was assigned event ID 115 but 113 was passed to WriteEvent.
+A trusted certificate was found: 161373C44E91E2269B3A24C6B121270D7E2EA864 - CN=localhost - Valid from 2026-02-12 18:45:50Z to 2027-02-12 18:45:50Z - IsHttpsDevelopmentCertificate: true - IsExportable: true

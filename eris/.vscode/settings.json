@@ -1,0 +1,11 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "dotnet workload": true,
+    "dotnet sln": true,
+    "/^ls -la && dotnet --version$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "mv": true
+  }
+}
