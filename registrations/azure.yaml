@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: registration-functions
+metadata:
+  template: registration-functions
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+services:
+  registrations:
+    project: ./RegistrationFunctionsJs
+    language: js
+    host: function

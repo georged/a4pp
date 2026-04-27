@@ -1,0 +1,42 @@
+Using launch settings from Eris.AppHost/Properties/launchSettings.json...
+Building...
+info: Aspire.Hosting.DistributedApplication[0]
+      Aspire version: 9.5.2+2fc27528ec03a94f2d6c663c9fa2392a9568ee41
+info: Aspire.Hosting.DistributedApplication[0]
+      Distributed application starting.
+info: Aspire.Hosting.DistributedApplication[0]
+      Application host directory is: /Users/theenabler/code/public/ppazure/eris/Eris.AppHost
+info: Aspire.Hosting.DistributedApplication[0]
+      Distributed application started. Press Ctrl+C to shut down.
+info: Aspire.Hosting.DistributedApplication[0]
+      Now listening on: https://localhost:17203
+info: Aspire.Hosting.DistributedApplication[0]
+      Login to the dashboard at https://localhost:17203/login?t=b75ba84b67ddebcc363162f622d12003
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/eris-api-https", "Reconciliation": 210, "error": "could not start the proxy for the service: listen tcp [::1]:7294: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/eris-api-https", "Reconciliation": 211, "error": "could not start the proxy for the service: listen tcp [::1]:7294: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/aspire-dashboard-otlp-grpc", "Reconciliation": 213, "error": "could not start the proxy for the service: listen tcp [::1]:21253: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/aspire-dashboard-otlp-grpc", "Reconciliation": 214, "error": "could not start the proxy for the service: listen tcp [::1]:21253: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/eris-api-http", "Reconciliation": 215, "error": "could not start the proxy for the service: listen tcp [::1]:5158: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/eris-api-http", "Reconciliation": 216, "error": "could not start the proxy for the service: listen tcp [::1]:5158: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/hermes-app-http", "Reconciliation": 217, "error": "could not start the proxy for the service: listen tcp [::1]:5229: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/hermes-app-http", "Reconciliation": 218, "error": "could not start the proxy for the service: listen tcp [::1]:5229: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/aspire-dashboard-https", "Reconciliation": 219, "error": "could not start the proxy for the service: listen tcp [::1]:17203: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/aspire-dashboard-https", "Reconciliation": 220, "error": "could not start the proxy for the service: listen tcp [::1]:17203: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/hermes-app-https", "Reconciliation": 221, "error": "could not start the proxy for the service: listen tcp [::1]:7280: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/hermes-app-https", "Reconciliation": 222, "error": "could not start the proxy for the service: listen tcp [::1]:7280: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/aspire-dashboard-http", "Reconciliation": 223, "error": "could not start the proxy for the service: listen tcp [::1]:15118: bind: address already in use"}
+fail: Aspire.Hosting.Dcp.dcpctrl.dcpctrl.ServiceReconciler[0]
+      Could not start the proxy	{"Service": "/aspire-dashboard-http", "Reconciliation": 224, "error": "could not start the proxy for the service: listen tcp [::1]:15118: bind: address already in use"}
