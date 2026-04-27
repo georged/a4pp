@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
+const string hiddenRegistrationPrefix = "__direct__::";
 
 builder.AddServiceDefaults();
 
@@ -19,7 +20,7 @@ builder.Services.AddSignalR();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient("delivery", client =>
 {
-	client.Timeout = TimeSpan.FromSeconds(20);
+	client.Timeout = TimeSpan.FromSeconds(5);
 });
 builder.Services.AddScoped(sp =>
 {
@@ -74,9 +75,44 @@ app.MapGet("/api/registrations", async (HttpContext httpContext, IDbContextFacto
 	var studentKey = ResolveStudentKey(httpContext);
 	await using var db = await dbFactory.CreateDbContextAsync(ct);
 	return await db.Registrations
-		.Where(x => x.OwnerKey == studentKey)
+		.Where(x => x.OwnerKey == studentKey && !x.Name.StartsWith(hiddenRegistrationPrefix))
 		.OrderBy(x => x.CreatedAtUtc)
 		.ToListAsync(ct);
+});
+
+app.MapPost("/api/registrations/resolve", async (HttpContext httpContext, ResolveRegistrationRequest request, IDbContextFactory<ErisDbContext> dbFactory, CancellationToken ct) =>
+{
+	var studentKey = ResolveStudentKey(httpContext);
+
+	if (!Uri.TryCreate(request.EndpointUrl, UriKind.Absolute, out var endpointUri)
+		|| (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
+	{
+		return Results.BadRequest("EndpointUrl must be a valid http/https URL.");
+	}
+
+	var normalizedUrl = request.EndpointUrl.Trim();
+
+	await using var db = await dbFactory.CreateDbContextAsync(ct);
+	var existing = await db.Registrations
+		.FirstOrDefaultAsync(x => x.OwnerKey == studentKey && x.EndpointUrl == normalizedUrl, ct);
+
+	if (existing is not null)
+	{
+		return Results.Ok(new { id = existing.Id });
+	}
+
+	var registration = new RegistrationEndpoint
+	{
+		Id = Guid.NewGuid(),
+		OwnerKey = studentKey,
+		Name = $"{hiddenRegistrationPrefix}{endpointUri.Host}",
+		EndpointUrl = normalizedUrl,
+		CreatedAtUtc = DateTime.UtcNow
+	};
+
+	db.Registrations.Add(registration);
+	await db.SaveChangesAsync(ct);
+	return Results.Ok(new { id = registration.Id });
 });
 
 app.MapPost("/api/registrations", async (HttpContext httpContext, CreateRegistrationRequest request, IDbContextFactory<ErisDbContext> dbFactory, CancellationToken ct) =>
@@ -194,6 +230,29 @@ app.MapGet("/api/registrations/{id:guid}/history", async (HttpContext httpContex
 		.ToListAsync(ct);
 
 	return Results.Ok(history);
+});
+
+app.MapDelete("/api/registrations/{id:guid}/history", async (HttpContext httpContext, Guid id, IDbContextFactory<ErisDbContext> dbFactory, CancellationToken ct) =>
+{
+	var studentKey = ResolveStudentKey(httpContext);
+	await using var db = await dbFactory.CreateDbContextAsync(ct);
+	var owned = await db.Registrations.AnyAsync(x => x.Id == id && x.OwnerKey == studentKey, ct);
+	if (!owned)
+	{
+		return Results.NotFound();
+	}
+
+	var records = await db.EventRecords
+		.Where(x => x.RegistrationEndpointId == id)
+		.ToListAsync(ct);
+
+	if (records.Count > 0)
+	{
+		db.EventRecords.RemoveRange(records);
+		await db.SaveChangesAsync(ct);
+	}
+
+	return Results.NoContent();
 });
 
 app.MapGet("/api/registrations/{id:guid}/stats", async (HttpContext httpContext, Guid id, IDbContextFactory<ErisDbContext> dbFactory, CancellationToken ct) =>

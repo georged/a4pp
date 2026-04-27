@@ -3,7 +3,6 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "node",
-    "ServiceBusConnection__fullyQualifiedNamespace": "<your-servicebus-namespace>.servicebus.windows.net",
-    "DATAVERSE_ENVIRONMENT_URL": "https://trek-dev.crm6.dynamics.com"
+    "ServiceBusConnection__fullyQualifiedNamespace": "<your-servicebus-namespace>.servicebus.windows.net"
   }
 }

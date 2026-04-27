@@ -2,15 +2,11 @@
   "name": "registration-functions-js",
   "version": "1.0.0",
   "private": true,
-  "description": "HTTP to Service Bus to Dataverse Azure Functions",
-  "main": "src/*.js",
+  "description": "HTTP ingest to Service Bus Azure Function",
   "scripts": {
     "start": "func start",
     "build": "echo \"No build step required for JavaScript\"",
     "lint": "echo \"No lint step configured\""
   },
-  "dependencies": {
-    "@azure/functions": "^4.7.2",
-    "@azure/identity": "^4.4.1"
-  }
+  "dependencies": {}
 }

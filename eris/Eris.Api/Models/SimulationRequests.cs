@@ -6,15 +6,18 @@ public class CreateRegistrationRequest
     public string EndpointUrl { get; set; } = string.Empty;
 }
 
+public class ResolveRegistrationRequest
+{
+    public string EndpointUrl { get; set; } = string.Empty;
+}
+
 public class StartSimulationRequest
 {
-    public string Scenario { get; set; } = "single-valid";
+    public string Scenario { get; set; } = "mixed";
     public int Count { get; set; } = 1;
-    public string Mode { get; set; } = "parallel";
-    public int RatePerSecond { get; set; } = 10;
+    public int MaxConcurrency { get; set; } = 10;
     public int ValidCount { get; set; } = 10;
-    public int InvalidCount { get; set; } = 2;
-    public int DuplicateCount { get; set; } = 2;
+    public int DuplicateCount { get; set; } = 0;
 }
 
 public class SimulationProgress

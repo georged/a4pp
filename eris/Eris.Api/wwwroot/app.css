@@ -185,3 +185,34 @@ button {
 }
 
 .muted { color: var(--muted); }
+
+.dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-panel {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 20px;
+    min-width: 600px;
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.row-fail td { background: #fff5f5; }
+
+.error-cell {
+    color: #b21f35;
+    font-size: 0.85em;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

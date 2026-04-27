@@ -45,40 +45,11 @@ public class ScenarioRunner(
         try
         {
             var items = await BuildItemsAsync(registrationId, request, CancellationToken.None);
-            var isSequential = string.Equals(request.Mode, "sequential", StringComparison.OrdinalIgnoreCase);
-
-            if (isSequential)
+            var semaphore = new SemaphoreSlim(Math.Max(1, request.MaxConcurrency));
+            var tasks = items.Select(async item =>
             {
-                var rate = Math.Max(1, request.RatePerSecond);
-                var delayMs = (int)Math.Max(1, Math.Floor(1000d / rate));
-
-                foreach (var item in items)
-                {
-                    var ok = await deliveryEngine.SendAsync(
-                        registrationId,
-                        endpointUrl,
-                        item.PayloadJson,
-                        request.Scenario,
-                        item.IsDuplicate,
-                        CancellationToken.None);
-
-                    sent++;
-                    if (ok)
-                    {
-                        succeeded++;
-                    }
-                    else
-                    {
-                        failed++;
-                    }
-
-                    await progressPublisher.PublishProgressAsync(runId, BuildProgress(runId, request.Scenario, sent, succeeded, failed, true));
-                    await Task.Delay(delayMs);
-                }
-            }
-            else
-            {
-                var tasks = items.Select(async item =>
+                await semaphore.WaitAsync();
+                try
                 {
                     var ok = await deliveryEngine.SendAsync(
                         registrationId,
@@ -89,20 +60,18 @@ public class ScenarioRunner(
                         CancellationToken.None);
 
                     var totalNow = Interlocked.Increment(ref sent);
-                    if (ok)
-                    {
-                        Interlocked.Increment(ref succeeded);
-                    }
-                    else
-                    {
-                        Interlocked.Increment(ref failed);
-                    }
+                    if (ok) Interlocked.Increment(ref succeeded);
+                    else Interlocked.Increment(ref failed);
 
                     await progressPublisher.PublishProgressAsync(runId, BuildProgress(runId, request.Scenario, totalNow, succeeded, failed, true));
-                });
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
 
-                await Task.WhenAll(tasks);
-            }
+            await Task.WhenAll(tasks);
 
             await MarkRunCompletedAsync(runId, sent, succeeded, failed, CancellationToken.None);
             await progressPublisher.PublishProgressAsync(runId, BuildProgress(runId, request.Scenario, sent, succeeded, failed, false));
@@ -157,26 +126,11 @@ public class ScenarioRunner(
             return items;
         }
 
-        if (scenario == "invalid")
-        {
-            for (var i = 0; i < Math.Max(1, request.Count); i++)
-            {
-                items.Add(new SimulationItem(eventGenerator.GenerateInvalidJson(), false));
-            }
-
-            return items;
-        }
-
         if (scenario == "mixed")
         {
             for (var i = 0; i < Math.Max(0, request.ValidCount); i++)
             {
                 items.Add(new SimulationItem(eventGenerator.GenerateValidJson(), false));
-            }
-
-            for (var i = 0; i < Math.Max(0, request.InvalidCount); i++)
-            {
-                items.Add(new SimulationItem(eventGenerator.GenerateInvalidJson(), false));
             }
 
             var duplicatePayload = eventGenerator.GenerateValidJson();

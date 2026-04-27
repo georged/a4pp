@@ -2,5 +2,4 @@
   <Project Path="Eris.Api/Eris.Api.csproj" />
   <Project Path="Eris.AppHost/Eris.AppHost.csproj" />
   <Project Path="Eris.ServiceDefaults/Eris.ServiceDefaults.csproj" />
-  <Project Path="Hermes.App/Hermes.App.csproj" />
 </Solution>

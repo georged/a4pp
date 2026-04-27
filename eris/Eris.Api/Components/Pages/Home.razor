@@ -7,77 +7,79 @@
 
 <PageTitle>Eris Student</PageTitle>
 
-<h1>Student Simulator</h1>
-<p class="muted">Your registrations are isolated by your browser session key. Programmatic clients can use header <code>X-Eris-Student-Key</code>.</p>
-<p><strong>Your spiritual animal (API key):</strong> @studentKey</p>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div>
+        <h1 style="margin:0">Student Simulator</h1>
+        <p class="muted" style="margin:4px 0 0 0">Session key: <strong>@studentKey</strong></p>
+    </div>
+</div>
+
+@if (showWebhooksDialog)
+{
+    <div class="dialog-overlay" @onclick="() => showWebhooksDialog = false">
+        <div class="dialog-panel" @onclick:stopPropagation>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h2 style="margin:0">Registered Webhooks</h2>
+                <button @onclick="() => showWebhooksDialog = false">&#x2715;</button>
+            </div>
+            <div class="field-grid" style="grid-template-columns: 2fr 3fr auto; align-items: end;">
+                <div class="field">
+                    <label>Name</label>
+                    <InputText @bind-Value="createRequest.Name" class="@NameInputClass" />
+                </div>
+                <div class="field">
+                    <label>Endpoint URL</label>
+                    <InputText @bind-Value="createRequest.EndpointUrl" class="@UrlInputClass" />
+                </div>
+                <div class="field">
+                    <button @onclick="CreateRegistrationAsync">Add</button>
+                </div>
+            </div>
+            @if (showAddValidation && (NameMissing || UrlMissing))
+            {
+                <p class="validation-hint">Name and Endpoint URL are required.</p>
+            }
+            <table class="table" style="margin-top:10px;">
+                <thead>
+                    <tr>
+                        <th class="col-name">Name</th>
+                        <th class="col-endpoint">Endpoint</th>
+                        <th class="col-actions"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (registrations.Count == 0)
+                    {
+                        <tr><td colspan="3" class="muted">No webhooks registered yet.</td></tr>
+                    }
+                    @foreach (var item in registrations)
+                    {
+                        <tr>
+                            <td class="col-name">@item.Name</td>
+                            <td class="col-endpoint endpoint-value">@item.EndpointUrl</td>
+                            <td class="col-actions"><button @onclick="() => DeleteRegistrationAsync(item.Id)">Deregister</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
 
 <div class="panel-grid">
     <section class="panel">
-        <h2>Registered Webhooks</h2>
-        <div class="field-grid" style="grid-template-columns: 2fr 3fr auto; align-items: end;">
-            <div class="field">
-                <label>Name</label>
-                <InputText @bind-Value="createRequest.Name" class="@NameInputClass" />
-            </div>
-            <div class="field">
-                <label>Endpoint URL</label>
-                <InputText @bind-Value="createRequest.EndpointUrl" class="@UrlInputClass" />
-            </div>
-            <div class="field">
-                <button @onclick="CreateRegistrationAsync">Add</button>
-            </div>
-        </div>
-
-        @if (showAddValidation && (NameMissing || UrlMissing))
-        {
-            <p class="validation-hint">Name and Endpoint URL are required.</p>
-        }
-
-        <table class="table" style="margin-top: 10px;">
-            <thead>
-                <tr>
-                    <th class="col-select"></th>
-                    <th class="col-name">Name</th>
-                    <th class="col-endpoint">Endpoint</th>
-                    <th class="col-actions"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (registrations.Count == 0)
-                {
-                    <tr>
-                        <td colspan="4" class="muted">No webhooks registered yet.</td>
-                    </tr>
-                }
-                @foreach (var item in registrations)
-                {
-                    <tr>
-                        <td class="col-select">
-                            <input type="radio" name="destination" checked="@(SelectedRegistrationId == item.Id)" @onchange="() => SelectDestination(item.Id)" />
-                        </td>
-                        <td class="col-name">@item.Name</td>
-                        <td class="col-endpoint endpoint-value">@item.EndpointUrl</td>
-                        <td class="col-actions"><button @onclick="() => DeleteRegistrationAsync(item.Id)">Deregister</button></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </section>
-
-    <section class="panel">
         <h2>Send Data</h2>
+        <div class="field">
+            <label>Destination URL</label>
+            <input type="url" value="@destinationUrl" @onchange="OnDestinationUrlChanged"
+                   placeholder="https://your-endpoint.example.com/api/ingest" style="width:100%" />
+        </div>
         <div class="field-grid">
             <div class="field"><label>Valid</label><input type="number" min="0" @bind="request.ValidCount" /></div>
-            <div class="field"><label>Invalid</label><input type="number" min="0" @bind="request.InvalidCount" /></div>
             <div class="field"><label>Duplicates</label><input type="number" min="0" @bind="request.DuplicateCount" /></div>
+            <div class="field"><label>Concurrency</label><input type="number" min="1" max="100" @bind="request.MaxConcurrency" /></div>
             <div class="field"><label>Total</label><input type="number" value="@TotalToSend" readonly /></div>
-            <div class="field"><label>Mode</label><select @bind="request.Mode"><option value="parallel">Parallel</option><option value="sequential">Sequential</option></select></div>
-            @if (IsSequentialMode)
-            {
-                <div class="field"><label>Rate/sec</label><input type="number" min="1" @bind="request.RatePerSecond" /></div>
-            }
         </div>
-
         <button type="button" @onclick="StartSimulationAsync" disabled="@(!CanSend)">Send Data</button>
     </section>
 
@@ -93,7 +95,6 @@
                 </div>
             </div>
         }
-
         <div class="metrics">
             <div><span>Sent</span><strong>@progress.Sent</strong></div>
             <div><span>Succeeded</span><strong>@progress.Succeeded</strong></div>
@@ -102,6 +103,46 @@
         </div>
     </section>
 </div>
+
+<section class="panel" style="margin-top:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h2 style="margin:0">Error history <span class="muted" style="font-size:0.8em;font-weight:normal">(last 200)</span></h2>
+        <div style="display:flex;gap:8px;">
+            <button type="button" @onclick="LoadHistoryAsync" disabled="@(currentRegistrationId == Guid.Empty)">Refresh</button>
+            <button type="button" @onclick="ClearHistoryAsync" disabled="@(currentRegistrationId == Guid.Empty)">Clear history</button>
+        </div>
+    </div>
+    @if (!history.Any(x => !x.IsSuccess))
+    {
+        <p class="muted">No errors yet.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:80px">Sent At</th>
+                    <th style="width:60px">Status</th>
+                    <th style="width:80px">Latency</th>
+                    <th style="width:70px">Duplicate</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in history.Where(x => !x.IsSuccess))
+                {
+                    <tr class="row-fail">
+                        <td>@item.SentAtUtc.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td>@(item.StatusCode?.ToString() ?? "N/A")</td>
+                        <td>@item.LatencyMs ms</td>
+                        <td>@(item.IsDuplicate ? "Yes" : "")</td>
+                        <td class="error-cell">@item.Error</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
 
 @code {
     private readonly CreateRegistrationRequest createRequest = new();
@@ -117,11 +158,13 @@
     private int plannedRequestCount;
     private CancellationTokenSource? statusTickerCts;
 
-    private Guid SelectedRegistrationId => Guid.TryParse(selectedRegistrationIdString, out var id) ? id : Guid.Empty;
-    private string selectedRegistrationIdString = string.Empty;
-    private bool IsSequentialMode => string.Equals(request.Mode, "sequential", StringComparison.OrdinalIgnoreCase);
-    private int TotalToSend => Math.Max(0, request.ValidCount) + Math.Max(0, request.InvalidCount) + Math.Max(0, request.DuplicateCount);
-    private bool CanSend => !isRunning && SelectedRegistrationId != Guid.Empty && TotalToSend > 0;
+    private bool showWebhooksDialog;
+    private string destinationUrl = string.Empty;
+    private List<EventDeliveryRecord> history = [];
+    private Guid currentRegistrationId = Guid.Empty;
+
+    private int TotalToSend => Math.Max(0, request.ValidCount) + Math.Max(0, request.DuplicateCount);
+    private bool CanSend => !isRunning && !string.IsNullOrWhiteSpace(destinationUrl) && Uri.TryCreate(destinationUrl, UriKind.Absolute, out _) && TotalToSend > 0;
     private bool NameMissing => showAddValidation && string.IsNullOrWhiteSpace(createRequest.Name);
     private bool UrlMissing => showAddValidation && string.IsNullOrWhiteSpace(createRequest.EndpointUrl);
     private string NameInputClass => NameMissing ? "input-invalid" : string.Empty;
@@ -143,12 +186,50 @@
         studentKey = await JS.InvokeAsync<string>("erisStudentKey.getOrCreate");
         await EnsureStudentKeyAsync();
         await LoadRegistrationsAsync();
-        if (registrations.Count > 0)
-        {
-            selectedRegistrationIdString = registrations[0].Id.ToString();
-        }
 
+        destinationUrl = await GetStickyUrlAsync();
+        if (!string.IsNullOrWhiteSpace(destinationUrl))
+        {
+            var reg = registrations.FirstOrDefault(r => string.Equals(r.EndpointUrl, destinationUrl.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (reg is not null)
+            {
+                currentRegistrationId = reg.Id;
+                await LoadHistoryAsync();
+            }
+        }
         StateHasChanged();
+    }
+
+    private async Task OnDestinationUrlChanged(ChangeEventArgs e)
+    {
+        destinationUrl = e.Value?.ToString() ?? string.Empty;
+        await SetStickyUrlAsync(destinationUrl);
+    }
+
+    private async Task<string> GetStickyUrlAsync()
+    {
+        try
+        {
+            return await JS.InvokeAsync<string?>("erisStudentKey.getStickyUrl") ?? string.Empty;
+        }
+        catch (JSException)
+        {
+            // Fallback for stale browser script cache where helper methods may be missing.
+            return await JS.InvokeAsync<string?>("localStorage.getItem", "eris-destination-url") ?? string.Empty;
+        }
+    }
+
+    private async Task SetStickyUrlAsync(string value)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("erisStudentKey.setStickyUrl", value);
+        }
+        catch (JSException)
+        {
+            // Keep sticky URL behavior even when custom JS helpers aren't available.
+            await JS.InvokeVoidAsync("localStorage.setItem", "eris-destination-url", value);
+        }
     }
 
     private async Task EnsureStudentKeyAsync()
@@ -185,10 +266,6 @@
     private async Task LoadRegistrationsAsync()
     {
         registrations = await GetJsonAsync<List<RegistrationEndpoint>>("/api/registrations") ?? [];
-        if (registrations.Count > 0 && string.IsNullOrWhiteSpace(selectedRegistrationIdString))
-        {
-            selectedRegistrationIdString = registrations[0].Id.ToString();
-        }
     }
 
     private async Task CreateRegistrationAsync()
@@ -205,28 +282,29 @@
         createRequest.EndpointUrl = string.Empty;
         showAddValidation = false;
         await LoadRegistrationsAsync();
-
-        if (SelectedRegistrationId == Guid.Empty && registrations.Count > 0)
-        {
-            selectedRegistrationIdString = registrations[0].Id.ToString();
-        }
     }
 
     private async Task StartSimulationAsync()
     {
-        // Add-webhook validation should not appear during send flow.
         showAddValidation = false;
 
-        if (SelectedRegistrationId == Guid.Empty || string.IsNullOrWhiteSpace(studentKey))
+        if (string.IsNullOrWhiteSpace(destinationUrl) || string.IsNullOrWhiteSpace(studentKey))
         {
             return;
         }
 
+        var registrationId = await ResolveRegistrationIdAsync(destinationUrl.Trim());
+        if (registrationId == Guid.Empty)
+        {
+            return;
+        }
+
+        currentRegistrationId = registrationId;
         request.Scenario = "mixed";
         request.Count = TotalToSend;
         plannedRequestCount = TotalToSend;
 
-        var response = await PostJsonAsync($"/api/registrations/{SelectedRegistrationId}/simulate", request);
+        var response = await PostJsonAsync($"/api/registrations/{registrationId}/simulate", request);
         var payload = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
         if (payload is null || !payload.TryGetValue("runId", out var runIdText) || !Guid.TryParse(runIdText, out var runId))
         {
@@ -269,11 +347,54 @@
         {
             isRunning = false;
             StopStatusTicker();
+            var historyTask = LoadHistoryAsync();
             InvokeAsync(StateHasChanged);
         });
 
         await hubConnection.StartAsync();
         await hubConnection.InvokeAsync("JoinSimulation", runId.ToString());
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        if (currentRegistrationId == Guid.Empty)
+        {
+            return;
+        }
+
+        history = await GetJsonAsync<List<EventDeliveryRecord>>($"/api/registrations/{currentRegistrationId}/history") ?? [];
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClearHistoryAsync()
+    {
+        if (currentRegistrationId == Guid.Empty)
+        {
+            return;
+        }
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/registrations/{currentRegistrationId}/history");
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+        using var response = await Http.SendAsync(requestMessage);
+        if (!response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        history = [];
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task<Guid> ResolveRegistrationIdAsync(string endpointUrl)
+    {
+        using var response = await PostJsonAsync("/api/registrations/resolve", new ResolveRegistrationRequest { EndpointUrl = endpointUrl });
+        var payload = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        if (payload is null || !payload.TryGetValue("id", out var idText) || !Guid.TryParse(idText, out var id))
+        {
+            return Guid.Empty;
+        }
+
+        return id;
     }
 
     private async Task DeleteRegistrationAsync(Guid id)
@@ -288,17 +409,6 @@
         }
 
         await LoadRegistrationsAsync();
-
-        if (SelectedRegistrationId == id)
-        {
-            selectedRegistrationIdString = registrations.Count > 0 ? registrations[0].Id.ToString() : string.Empty;
-        }
-    }
-
-    private void SelectDestination(Guid id)
-    {
-        showAddValidation = false;
-        selectedRegistrationIdString = id.ToString();
     }
 
     public async ValueTask DisposeAsync()

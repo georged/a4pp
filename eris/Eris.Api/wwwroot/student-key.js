@@ -26,4 +26,13 @@ window.erisStudentKey = {
       window.localStorage.setItem("eris-student-key", value);
     }
   }
+  ,
+  getStickyUrl: function () {
+    return window.localStorage.getItem("eris-destination-url");
+  },
+  setStickyUrl: function (value) {
+    if (value !== null && value !== undefined) {
+      window.localStorage.setItem("eris-destination-url", value);
+    }
+  }
 };
