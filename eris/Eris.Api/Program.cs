@@ -35,7 +35,7 @@ builder.Services.AddSignalR();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient("delivery", client =>
 {
-	client.Timeout = TimeSpan.FromSeconds(5);
+	client.Timeout = TimeSpan.FromSeconds(20);
 });
 builder.Services.AddScoped(sp =>
 {
