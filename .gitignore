@@ -7,6 +7,9 @@ node_modules/
 dist/
 build/
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 .env
 .DS_Store
 .playwright-mcp

@@ -14,3 +14,8 @@ services:
     project: ./RegistrationFunctionsJs
     language: js
     host: function
+
+hooks:
+  postprovision:
+    shell: sh
+    run: ./infra/postprovision.sh
