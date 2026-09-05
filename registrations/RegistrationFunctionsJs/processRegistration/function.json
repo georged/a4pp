@@ -1,11 +1,12 @@
 {
   "bindings": [
     {
-      "name": "message",
+      "name": "messages",
       "type": "serviceBusTrigger",
       "direction": "in",
       "queueName": "registrations",
-      "connection": "ServiceBusConnection"
+      "connection": "ServiceBusConnection",
+      "cardinality": "many"
     }
   ]
 }
