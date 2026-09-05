@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "appName": {
+      "value": "eris"
+    },
+    "containerAppName": {
+      "value": "eris-api"
+    },
+    "databasePath": {
+      "value": "/tmp/eris/eris.db"
+    },
+    "minReplicas": {
+      "value": 1
+    },
+    "maxReplicas": {
+      "value": 1
+    },
+    "cpu": {
+      "value": 1
+    },
+    "memory": {
+      "value": "2Gi"
+    },
+    "tags": {
+      "value": {
+        "application": "eris",
+        "environment": "prod",
+        "managedBy": "copilot"
+      }
+    }
+  }
+}

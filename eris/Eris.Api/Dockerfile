@@ -1,21 +1,16 @@
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS builder
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 
 WORKDIR /src
 
-# Copy solution and project files first for better layer caching.
-COPY ["Eris.slnx", "."]
 COPY ["Eris.Api/Eris.Api.csproj", "Eris.Api/"]
 COPY ["Eris.ServiceDefaults/Eris.ServiceDefaults.csproj", "Eris.ServiceDefaults/"]
-COPY ["Hermes.App/Hermes.App.csproj", "Hermes.App/"]
-COPY ["Eris.AppHost/Eris.AppHost.csproj", "Eris.AppHost/"]
 
-RUN dotnet restore "Eris.slnx"
+RUN dotnet restore "Eris.Api/Eris.Api.csproj"
 
-# Copy all source and publish Eris.Api.
 COPY . .
 RUN dotnet publish "Eris.Api/Eris.Api.csproj" -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 
 WORKDIR /app
 

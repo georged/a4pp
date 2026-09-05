@@ -9,3 +9,4 @@ build/
 *.db
 .env
 .DS_Store
+.playwright-mcp

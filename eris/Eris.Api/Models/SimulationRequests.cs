@@ -75,3 +75,18 @@ public class BulkDeleteWebhooksRequest
 {
     public List<Guid> RegistrationIds { get; set; } = [];
 }
+
+public class QueueMetricsRequest
+{
+    public string ConnectionString { get; set; } = string.Empty;
+    public string? QueueName { get; set; }
+    public int PlannedAdditionalMessages { get; set; }
+}
+
+public class QueueMetricsResponse
+{
+    public string QueueName { get; set; } = string.Empty;
+    public long ActiveMessageCount { get; set; }
+    public long PlannedAdditionalMessages { get; set; }
+    public long ScaleMax { get; set; }
+}

@@ -1,5 +1,6 @@
 @page "/"
 @rendermode InteractiveServer
+@using System.Text.Json
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -106,6 +107,93 @@
 
 <section class="panel" style="margin-top:12px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h2 style="margin:0">Queue Monitors</h2>
+        <button type="button" @onclick="AddQueuePanel">+ Add queue</button>
+    </div>
+
+    @if (queuePanels.Count == 0)
+    {
+        <p class="muted">No queue monitors yet. Click "Add queue" to watch a Service Bus queue fill up and drain.</p>
+    }
+    else
+    {
+        <div class="queue-panels-grid">
+            @foreach (var panel in queuePanels)
+            {
+                <div class="queue-card" @key="panel.Id">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <p class="muted" style="margin:0">Queue: <strong>@(panel.Metrics?.QueueName ?? "(not connected)")</strong></p>
+                        <button type="button" class="icon-button" title="Remove queue monitor" @onclick="() => RemoveQueuePanel(panel.Id)">&#x2715;</button>
+                    </div>
+                    <div class="field">
+                        <label>Service Bus queue connection string</label>
+                        <input type="password"
+                               value="@panel.ConnectionString"
+                               @onchange="@(e => OnPanelConnectionStringChanged(panel, e))"
+                               placeholder="Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=...;EntityPath=registrations" />
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(panel.Error))
+                    {
+                        <p class="validation-hint">@panel.Error</p>
+                    }
+
+                    <div class="queue-visual">
+                        <div class="queue-ring">
+                            <svg class="queue-ring-svg" viewBox="0 0 140 140" aria-hidden="true">
+                                <circle class="queue-ring-track" cx="70" cy="70" r="56" fill="none" stroke="#e8eff4" stroke-width="12"></circle>
+                                <circle class="queue-ring-progress"
+                                        cx="70"
+                                        cy="70"
+                                        r="56"
+                                    fill="none"
+                                    stroke="#0f9d8a"
+                                    stroke-width="12"
+                                    stroke-linecap="round"
+                                        style="stroke-dasharray:@QueueRingCircumference;stroke-dashoffset:@(QueueRingCircumference * (1d - (panel.GaugePercent / 100d)))"></circle>
+                            </svg>
+                            <div class="queue-ring-center">
+                                <div class="queue-ring-value">@panel.CurrentDepth</div>
+                                <div class="queue-ring-label">messages</div>
+                            </div>
+                        </div>
+
+                        <div class="queue-meta">
+                            <div class="queue-meta-row">
+                                <span>Utilization</span>
+                                <strong>@panel.GaugePercent.ToString("0.0")%</strong>
+                            </div>
+                            <div class="queue-meta-row">
+                                <span>Gauge max</span>
+                                <strong>@panel.GaugeMax</strong>
+                            </div>
+                            <div class="queue-meta-row">
+                                <span>Planned sends</span>
+                                <strong>@TotalToSend</strong>
+                            </div>
+                            <div class="queue-meta-row">
+                                <span>Draining Rate</span>
+                                <strong>@panel.DrainRateDisplay</strong>
+                            </div>
+                            <div class="queue-trend @panel.TrendClass">
+                                <span>@panel.TrendLabel</span>
+                                <strong>@panel.DeltaDisplay</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (panel.Metrics is null)
+                    {
+                        <p class="muted">Enter a valid queue connection string to stream live queue depth.</p>
+                    }
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<section class="panel" style="margin-top:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <h2 style="margin:0">Error history <span class="muted" style="font-size:0.8em;font-weight:normal">(last 200)</span></h2>
         <div style="display:flex;gap:8px;">
             <button type="button" @onclick="LoadHistoryAsync" disabled="@(currentRegistrationId == Guid.Empty)">Refresh</button>
@@ -162,6 +250,42 @@
     private string destinationUrl = string.Empty;
     private List<EventDeliveryRecord> history = [];
     private Guid currentRegistrationId = Guid.Empty;
+    private List<QueueMonitorPanel> queuePanels = [];
+    private CancellationTokenSource? queueMonitorCts;
+
+    private class QueueMonitorPanel
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+        public string ConnectionString { get; set; } = string.Empty;
+        public QueueMetricsResponse? Metrics { get; set; }
+        public string? Error { get; set; }
+        public bool Busy { get; set; }
+        public long? LastDepth { get; set; }
+        public long Delta { get; set; }
+        public long? FrozenGaugeMax { get; set; }
+        public DateTime? LastPollAtUtc { get; set; }
+        public double DrainedMessages { get; set; }
+        public double DrainSeconds { get; set; }
+
+        public long CurrentDepth => Metrics?.ActiveMessageCount ?? 0;
+        public long GaugeMax => FrozenGaugeMax ?? RoundGaugeMax(CurrentDepth);
+        public double GaugePercent => Math.Min(100d, Math.Max(0d, (double)CurrentDepth / GaugeMax * 100d));
+        public string TrendLabel => Delta > 0 ? "Filling" : Delta < 0 ? "Draining" : "Steady";
+        public string TrendClass => Delta > 0 ? "trend-up" : Delta < 0 ? "trend-down" : "trend-flat";
+        public string DeltaDisplay => Delta > 0 ? $"+{Delta}" : Delta.ToString();
+        public double? DrainRatePerSecond => DrainSeconds > 0 ? DrainedMessages / DrainSeconds : null;
+        public string DrainRateDisplay => DrainRatePerSecond is double rate ? $"{rate:0.0}/s" : "—";
+
+        public void ResetStats()
+        {
+            LastDepth = null;
+            Delta = 0;
+            FrozenGaugeMax = null;
+            LastPollAtUtc = null;
+            DrainedMessages = 0;
+            DrainSeconds = 0;
+        }
+    }
 
     private int TotalToSend => Math.Max(0, request.ValidCount) + Math.Max(0, request.DuplicateCount);
     private bool CanSend => !isRunning && !string.IsNullOrWhiteSpace(destinationUrl) && Uri.TryCreate(destinationUrl, UriKind.Absolute, out _) && TotalToSend > 0;
@@ -174,6 +298,7 @@
     private string ElapsedText => runStartedAtUtc is null
         ? "0s"
         : $"{Math.Max(0, (int)(DateTime.UtcNow - runStartedAtUtc.Value).TotalSeconds)}s";
+    private static double QueueRingCircumference => 2d * Math.PI * 56d;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -188,6 +313,7 @@
         await LoadRegistrationsAsync();
 
         destinationUrl = await GetStickyUrlAsync();
+        await LoadQueuePanelsAsync();
         if (!string.IsNullOrWhiteSpace(destinationUrl))
         {
             var reg = registrations.FirstOrDefault(r => string.Equals(r.EndpointUrl, destinationUrl.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -197,6 +323,8 @@
                 await LoadHistoryAsync();
             }
         }
+
+        StartQueueMonitor();
         StateHasChanged();
     }
 
@@ -204,6 +332,28 @@
     {
         destinationUrl = e.Value?.ToString() ?? string.Empty;
         await SetStickyUrlAsync(destinationUrl);
+    }
+
+    private async Task OnPanelConnectionStringChanged(QueueMonitorPanel panel, ChangeEventArgs e)
+    {
+        panel.ConnectionString = e.Value?.ToString() ?? string.Empty;
+        panel.ResetStats();
+        await SaveQueuePanelsAsync();
+        await RefreshQueuePanelAsync(panel);
+    }
+
+    private async Task AddQueuePanel()
+    {
+        queuePanels.Add(new QueueMonitorPanel());
+        await SaveQueuePanelsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RemoveQueuePanel(Guid id)
+    {
+        queuePanels.RemoveAll(p => p.Id == id);
+        await SaveQueuePanelsAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task<string> GetStickyUrlAsync()
@@ -230,6 +380,40 @@
             // Keep sticky URL behavior even when custom JS helpers aren't available.
             await JS.InvokeVoidAsync("localStorage.setItem", "eris-destination-url", value);
         }
+    }
+
+    private async Task LoadQueuePanelsAsync()
+    {
+        var connections = await GetQueueConnectionStringsAsync();
+        queuePanels = connections.Count > 0
+            ? connections.Select(cs => new QueueMonitorPanel { ConnectionString = cs }).ToList()
+            : [new QueueMonitorPanel()];
+    }
+
+    private async Task<List<string>> GetQueueConnectionStringsAsync()
+    {
+        var json = await JS.InvokeAsync<string?>("localStorage.getItem", "eris-queue-connections");
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+            }
+            catch (JsonException)
+            {
+                return [];
+            }
+        }
+
+        // Back-compat: migrate the previous single-queue connection string, if any.
+        var legacy = await JS.InvokeAsync<string?>("localStorage.getItem", "eris-queue-connection");
+        return string.IsNullOrWhiteSpace(legacy) ? [] : [legacy];
+    }
+
+    private async Task SaveQueuePanelsAsync()
+    {
+        var connections = queuePanels.Select(p => p.ConnectionString).ToList();
+        await JS.InvokeVoidAsync("localStorage.setItem", "eris-queue-connections", JsonSerializer.Serialize(connections));
     }
 
     private async Task EnsureStudentKeyAsync()
@@ -303,6 +487,7 @@
         request.Scenario = "mixed";
         request.Count = TotalToSend;
         plannedRequestCount = TotalToSend;
+        await CaptureQueueGaugeMaxAsync();
 
         var response = await PostJsonAsync($"/api/registrations/{registrationId}/simulate", request);
         var payload = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
@@ -366,6 +551,121 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    private async Task RefreshAllQueueMetricsAsync()
+    {
+        await Task.WhenAll(queuePanels.Select(RefreshQueuePanelAsync));
+    }
+
+    private async Task RefreshQueuePanelAsync(QueueMonitorPanel panel)
+    {
+        if (panel.Busy)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(panel.ConnectionString))
+        {
+            panel.Metrics = null;
+            panel.Error = null;
+            panel.ResetStats();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        panel.Busy = true;
+        try
+        {
+            var latest = await TryFetchQueueMetricsAsync(panel);
+            if (latest is not null)
+            {
+                ApplyQueueMetrics(panel, latest);
+            }
+        }
+        catch (Exception ex)
+        {
+            panel.Metrics = null;
+            panel.Error = ex.Message;
+        }
+        finally
+        {
+            panel.Busy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CaptureQueueGaugeMaxAsync()
+    {
+        foreach (var panel in queuePanels)
+        {
+            if (!string.IsNullOrWhiteSpace(panel.ConnectionString))
+            {
+                var latest = await TryFetchQueueMetricsAsync(panel);
+                if (latest is not null)
+                {
+                    ApplyQueueMetrics(panel, latest);
+                }
+            }
+
+            panel.FrozenGaugeMax = RoundGaugeMax(panel.CurrentDepth + TotalToSend);
+        }
+    }
+
+    private async Task<QueueMetricsResponse?> TryFetchQueueMetricsAsync(QueueMonitorPanel panel)
+    {
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/queue/metrics")
+        {
+            Content = JsonContent.Create(new QueueMetricsRequest
+            {
+                ConnectionString = panel.ConnectionString,
+                PlannedAdditionalMessages = TotalToSend
+            })
+        };
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+
+        using var response = await Http.SendAsync(requestMessage);
+        if (!response.IsSuccessStatusCode)
+        {
+            panel.Metrics = null;
+            panel.Error = await response.Content.ReadAsStringAsync();
+            return null;
+        }
+
+        var latest = await response.Content.ReadFromJsonAsync<QueueMetricsResponse>();
+        panel.Error = null;
+        return latest;
+    }
+
+    private static void ApplyQueueMetrics(QueueMonitorPanel panel, QueueMetricsResponse latest)
+    {
+        var now = DateTime.UtcNow;
+
+        if (panel.LastDepth.HasValue && panel.LastPollAtUtc.HasValue)
+        {
+            panel.Delta = latest.ActiveMessageCount - panel.LastDepth.Value;
+
+            var elapsedSeconds = (now - panel.LastPollAtUtc.Value).TotalSeconds;
+            if (panel.Delta < 0 && elapsedSeconds > 0)
+            {
+                panel.DrainedMessages += -panel.Delta;
+                panel.DrainSeconds += elapsedSeconds;
+            }
+        }
+        else
+        {
+            panel.Delta = 0;
+        }
+
+        panel.LastDepth = latest.ActiveMessageCount;
+        panel.LastPollAtUtc = now;
+        panel.Metrics = latest;
+    }
+
+    private static long RoundGaugeMax(long value)
+    {
+        var normalized = Math.Max(100L, value);
+        return ((normalized + 99L) / 100L) * 100L;
+    }
+
     private async Task ClearHistoryAsync()
     {
         if (currentRegistrationId == Guid.Empty)
@@ -414,6 +714,7 @@
     public async ValueTask DisposeAsync()
     {
         StopStatusTicker();
+        StopQueueMonitor();
 
         if (hubConnection is not null)
         {
@@ -453,6 +754,41 @@
                 }
 
                 await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void StartQueueMonitor()
+    {
+        StopQueueMonitor();
+        queueMonitorCts = new CancellationTokenSource();
+        _ = RunQueueMonitorAsync(queueMonitorCts.Token);
+    }
+
+    private void StopQueueMonitor()
+    {
+        if (queueMonitorCts is null)
+        {
+            return;
+        }
+
+        queueMonitorCts.Cancel();
+        queueMonitorCts.Dispose();
+        queueMonitorCts = null;
+    }
+
+    private async Task RunQueueMonitorAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try
+        {
+            await RefreshAllQueueMetricsAsync();
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                await RefreshAllQueueMetricsAsync();
             }
         }
         catch (OperationCanceledException)

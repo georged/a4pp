@@ -3,17 +3,32 @@ using Eris.Api.Hubs;
 using Eris.Api.Models;
 using Eris.Api.Services;
 using Eris.Api.Components;
+using Azure.Messaging.ServiceBus;
+using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 const string hiddenRegistrationPrefix = "__direct__::";
+var databasePath = builder.Configuration["ERIS_DB_PATH"];
+
+if (string.IsNullOrWhiteSpace(databasePath))
+{
+	databasePath = "eris.db";
+}
+
+var databaseDirectory = Path.GetDirectoryName(databasePath);
+
+if (!string.IsNullOrWhiteSpace(databaseDirectory))
+{
+	Directory.CreateDirectory(databaseDirectory);
+}
 
 builder.AddServiceDefaults();
 
 builder.Services.AddDbContextFactory<ErisDbContext>(options =>
-	options.UseSqlite("Data Source=eris.db"));
+	options.UseSqlite($"Data Source={databasePath}"));
 builder.Services.AddRazorComponents()
 	.AddInteractiveServerComponents();
 builder.Services.AddSignalR();
@@ -178,6 +193,57 @@ app.MapPost("/api/registrations/{id:guid}/simulate", async (HttpContext httpCont
 	catch (InvalidOperationException ex)
 	{
 		return Results.NotFound(ex.Message);
+	}
+});
+
+app.MapPost("/api/queue/metrics", async (HttpContext httpContext, QueueMetricsRequest request, CancellationToken ct) =>
+{
+	_ = ResolveStudentKey(httpContext);
+
+	if (string.IsNullOrWhiteSpace(request.ConnectionString))
+	{
+		return Results.BadRequest("ConnectionString is required.");
+	}
+
+	var conn = request.ConnectionString.Trim();
+	ServiceBusConnectionStringProperties parsed;
+	try
+	{
+		parsed = ServiceBusConnectionStringProperties.Parse(conn);
+	}
+	catch (Exception ex)
+	{
+		return Results.BadRequest($"Invalid Service Bus connection string: {ex.Message}");
+	}
+
+	var queueName = string.IsNullOrWhiteSpace(request.QueueName)
+		? parsed.EntityPath
+		: request.QueueName.Trim();
+
+	if (string.IsNullOrWhiteSpace(queueName))
+	{
+		return Results.BadRequest("QueueName is required unless the connection string includes EntityPath.");
+	}
+
+	try
+	{
+		var admin = new ServiceBusAdministrationClient(conn);
+		var runtime = await admin.GetQueueRuntimePropertiesAsync(queueName, ct);
+		var active = runtime.Value.ActiveMessageCount;
+		var planned = Math.Max(0, request.PlannedAdditionalMessages);
+		var scaleMax = Math.Max(1L, active + planned);
+
+		return Results.Ok(new QueueMetricsResponse
+		{
+			QueueName = queueName,
+			ActiveMessageCount = active,
+			PlannedAdditionalMessages = planned,
+			ScaleMax = scaleMax
+		});
+	}
+	catch (Exception ex)
+	{
+		return Results.BadRequest($"Failed to read queue metrics: {ex.Message}");
 	}
 });
 

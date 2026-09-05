@@ -1,0 +1,319 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;1,300&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  .poster {
+    width: 100%; aspect-ratio: 16/9;
+    background: #030810; position: relative; overflow: hidden;
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  }
+  .sky {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 50% 60% at 68% 0%, #0d1f3a 0%, transparent 65%),
+      radial-gradient(ellipse 70% 50% at 20% 5%, #080f20 0%, transparent 70%),
+      linear-gradient(180deg, #040912 0%, #07101e 35%, #0c1828 70%, #14202e 100%);
+  }
+  .aurora {
+    position: absolute; top: 0; left: 0; right: 0; height: 50%;
+    background:
+      radial-gradient(ellipse 55% 45% at 65% 15%, rgba(60,140,200,0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 35% at 30% 10%, rgba(30,100,160,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 40% at 78% 25%, rgba(80,180,210,0.06) 0%, transparent 55%);
+  }
+  .summit-glow {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 18% 30% at 68% 18%, rgba(180,220,255,0.12) 0%, transparent 60%);
+  }
+  .mtn-1 {
+    position: absolute; bottom: 22%; left: 0; right: 0; height: 55%; background: #0b1222;
+    clip-path: polygon(0% 100%, 0% 78%, 3% 68%, 6% 76%, 9% 58%, 12% 70%, 15% 53%, 18% 64%, 21% 46%, 24% 58%, 27% 42%, 30% 56%, 33% 38%, 36% 52%, 39% 40%, 42% 54%, 45% 34%, 48% 48%, 51% 36%, 54% 50%, 57% 28%, 60% 44%, 62% 32%, 64% 40%, 65.5% 24%, 67% 14%, 68% 2%, 69% 14%, 70.5% 24%, 72% 36%, 74% 28%, 76% 40%, 79% 28%, 82% 44%, 85% 32%, 88% 48%, 91% 36%, 94% 52%, 97% 38%, 100% 50%, 100% 100%);
+  }
+  .mtn-2 {
+    position: absolute; bottom: 15%; left: 0; right: 0; height: 50%; background: #101828;
+    clip-path: polygon(0% 100%, 0% 74%, 4% 82%, 7% 63%, 10% 75%, 14% 56%, 17% 68%, 20% 50%, 23% 62%, 26% 48%, 29% 60%, 32% 42%, 35% 55%, 38% 44%, 41% 58%, 44% 38%, 47% 52%, 50% 40%, 53% 54%, 56% 32%, 59% 48%, 62% 36%, 64.5% 26%, 65.5% 14%, 66.5% 5%, 67.5% 0%, 68.5% 5%, 69.5% 14%, 70.5% 24%, 72% 34%, 74% 26%, 76% 38%, 79% 28%, 82% 42%, 85% 32%, 88% 46%, 91% 34%, 94% 50%, 97% 38%, 100% 48%, 100% 100%);
+  }
+  .everest-ice {
+    position: absolute; bottom: 15%; left: 0; right: 0; height: 55%;
+    clip-path: polygon(63.5% 100%, 63.5% 54%, 65% 38%, 66% 24%, 67% 12%, 67.5% 3%, 68% 0%, 68.5% 3%, 69% 12%, 70% 22%, 71% 34%, 72.5% 50%, 72.5% 100%);
+    background: linear-gradient(180deg, #e8f4ff 0%, #cce4f8 10%, #a8cde8 25%, #7ab0d0 45%, #4a7fa8 65%, #2a5878 82%, #162e45 100%);
+    opacity: 0.9;
+  }
+  .everest-shimmer {
+    position: absolute; bottom: 56%; left: 64%; width: 9%; height: 15%;
+    background: radial-gradient(ellipse at 50% 90%, rgba(220,240,255,0.55) 0%, transparent 65%);
+  }
+  .everest-snow {
+    position: absolute; bottom: 15%; left: 0; right: 0; height: 55%;
+    clip-path: polygon(65.5% 100%, 65.5% 50%, 66.5% 32%, 67% 18%, 67.5% 8%, 68% 1%, 68.2% 8%, 68.5% 18%, 68.8% 26%, 69.2% 32%, 69.8% 44%, 69.8% 100%);
+    background: rgba(220,240,255,0.25);
+  }
+  .mtn-3 {
+    position: absolute; bottom: 8%; left: 0; right: 0; height: 40%; background: #182030;
+    clip-path: polygon(0% 100%, 0% 66%, 5% 76%, 9% 58%, 13% 72%, 17% 54%, 21% 66%, 25% 50%, 29% 63%, 33% 48%, 37% 62%, 41% 46%, 45% 58%, 49% 44%, 53% 58%, 57% 42%, 61% 56%, 65% 44%, 69% 54%, 73% 42%, 77% 56%, 81% 44%, 85% 58%, 89% 46%, 93% 60%, 97% 48%, 100% 58%, 100% 100%);
+  }
+  .mtn-front {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 21%; background: #0c1018;
+    clip-path: polygon(0% 100%, 0% 42%, 6% 58%, 12% 36%, 18% 54%, 24% 33%, 30% 50%, 36% 28%, 42% 48%, 48% 30%, 54% 50%, 60% 34%, 66% 53%, 72% 38%, 78% 56%, 84% 40%, 90% 56%, 96% 42%, 100% 54%, 100% 100%);
+  }
+  .snow-caps {
+    position: absolute; bottom: 8%; left: 0; right: 0; height: 40%;
+    clip-path: polygon(32% 100%, 32% 48%, 33% 44%, 34% 48%, 34% 100%, 44% 100%, 44% 46%, 45% 41%, 46% 46%, 46% 100%, 56% 100%, 56% 42%, 57% 37%, 58% 42%, 58% 100%);
+    background: rgba(200,225,245,0.15);
+  }
+  .route-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .moon {
+    position: absolute; top: 7%; right: 9%; width: 3.5%; padding-bottom: 3.5%;
+    background: #d8eaf8; border-radius: 50%;
+    box-shadow: 0 0 25px 8px rgba(180,220,255,0.2);
+  }
+
+  .content-left {
+    position: absolute; top: 0; left: 0; width: 54%; height: 100%;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 4% 5% 7% 6%;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(80,160,210,0.18);
+    border: 0.5px solid rgba(100,180,230,0.4);
+    color: #90c8e8;
+    font-size: clamp(10px, 0.975vw, 16px);
+    font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase;
+    padding: 3px 14px; border-radius: 1px;
+    margin-bottom: 3%; align-self: flex-start;
+  }
+  .company-name {
+    font-size: clamp(13px, 1.425vw, 25px);
+    letter-spacing: 0.42em; color: #7ab8d8; text-transform: uppercase;
+    margin-bottom: 1%; opacity: 0.9;
+  }
+  .title-wrap { line-height: 0.86; margin-bottom: 2.5%; }
+  .t1 {
+    font-family: 'Bebas Neue', 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(36px, 8.4vw, 144px);
+    letter-spacing: 0.06em; color: #ddeef8;
+    text-shadow: 0 0 50px rgba(80,160,220,0.3);
+    display: block;
+  }
+  .t1-ice {
+    color: #a8d8f0;
+    text-shadow: 0 0 40px rgba(100,200,240,0.5), 0 0 80px rgba(60,140,200,0.2);
+  }
+  .subtitle-race {
+    font-size: clamp(12px, 1.425vw, 24px);
+    letter-spacing: 0.32em; color: #6a9ab8; text-transform: uppercase; margin-bottom: 3%;
+  }
+  .divider {
+    width: 72px; height: 1px;
+    background: linear-gradient(to right, #5090b8, transparent);
+    margin-bottom: 3%;
+  }
+  .route-info { display: flex; align-items: center; gap: 2%; margin-bottom: 2.5%; }
+  .route-dot {
+    width: clamp(6px, 0.6vw, 10px); height: clamp(6px, 0.6vw, 10px);
+    border-radius: 50%; background: #7ab8d8; flex-shrink: 0;
+  }
+  .route-dot.end { background: #c8e8ff; box-shadow: 0 0 8px rgba(180,230,255,0.9); }
+  .route-dash {
+    flex: 1; height: 1px; max-width: 72px;
+    background: repeating-linear-gradient(to right, #5090b8 0, #5090b8 4px, transparent 4px, transparent 9px);
+    opacity: 0.55;
+  }
+  .route-label { font-size: clamp(10px, 1.125vw, 19px); letter-spacing: 0.15em; text-transform: uppercase; }
+  .route-label strong { color: #ddeef8; font-weight: 700; display: block; font-size: clamp(12px, 1.275vw, 22px); }
+  .route-label span { color: rgba(106,154,184,0.7); font-size: clamp(9px, 0.9vw, 15px); }
+
+  .stats-row { display: flex; gap: 5%; margin-top: 1.5%; align-items: flex-end; }
+  .stat { display: flex; flex-direction: column; }
+  .stat-num {
+    font-family: 'Bebas Neue', 'Impact', sans-serif;
+    font-size: clamp(27px, 4.95vw, 82px);
+    color: #ddeef8; line-height: 1;
+  }
+  .stat-unit {
+    font-size: clamp(9px, 0.975vw, 16px);
+    letter-spacing: 0.28em; color: #6090a8; text-transform: uppercase;
+  }
+  .stat-sep { width: 1px; background: rgba(80,140,180,0.2); align-self: stretch; }
+
+  .content-right {
+    position: absolute; top: 0; right: 0; width: 27%; height: 100%;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 0 4% 3% 2%;
+  }
+  .info-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2%; margin-bottom: 2%; }
+  .info-card {
+    background: rgba(5,12,22,0.75); border: 0.5px solid rgba(70,130,180,0.28);
+    border-radius: 2px; padding: clamp(7px, 1.1vw, 18px) clamp(9px, 1.3vw, 22px);
+  }
+  .info-card-label {
+    font-size: clamp(9px, 0.9vw, 15px);
+    letter-spacing: 0.3em; color: rgba(100,150,185,0.55); text-transform: uppercase; margin-bottom: 2px;
+  }
+  .info-card-value {
+    font-size: clamp(12px, 1.35vw, 22px);
+    letter-spacing: 0.1em; color: #90c0d8; font-weight: 700; text-transform: uppercase;
+  }
+  .reg-btn {
+    display: block; background: #2a6898; color: #e8f4ff;
+    font-size: clamp(10px, 1.08vw, 18px);
+    font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase;
+    padding: clamp(6px, 0.75vw, 12px) 0;
+    text-align: center; border-radius: 1px;
+    box-shadow: 0 0 20px rgba(40,120,180,0.35);
+  }
+  .bottom-strip {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: clamp(22px, 3vw, 46px);
+    background: rgba(3,6,14,0.92);
+    border-top: 0.5px solid rgba(60,120,170,0.2);
+    display: flex; align-items: center; justify-content: center; gap: 3.5%; padding: 0 3%;
+  }
+  .strip-item {
+    font-size: clamp(9px, 0.87vw, 15px);
+    letter-spacing: 0.22em; color: #ccd8e4; text-transform: uppercase;
+  }
+  .strip-dot { width: 3px; height: 3px; background: rgba(100,160,200,0.55); border-radius: 50%; flex-shrink: 0; }
+</style>
+
+<div class="poster">
+  <div class="sky"></div>
+  <div class="aurora"></div>
+  <div class="summit-glow"></div>
+
+  <svg class="route-svg" viewBox="0 0 1920 1080" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="75"   cy="55"  r="1.5" fill="#c8dff0" opacity="0.85"/>
+    <circle cx="200"  cy="38"  r="1"   fill="#d0e8f8" opacity="0.7"/>
+    <circle cx="340"  cy="85"  r="1.5" fill="#c0d8ee" opacity="0.75"/>
+    <circle cx="465"  cy="48"  r="1"   fill="#cce4f8" opacity="0.6"/>
+    <circle cx="610"  cy="68"  r="1.5" fill="#d0e8f8" opacity="0.7"/>
+    <circle cx="745"  cy="32"  r="1"   fill="#c8dff0" opacity="0.65"/>
+    <circle cx="870"  cy="52"  r="2"   fill="#daeeff" opacity="0.8"/>
+    <circle cx="955"  cy="78"  r="1"   fill="#c8dff0" opacity="0.55"/>
+    <circle cx="1045" cy="40"  r="1.5" fill="#d0e8f8" opacity="0.7"/>
+    <circle cx="1145" cy="62"  r="1"   fill="#cce0f0" opacity="0.55"/>
+    <circle cx="1230" cy="28"  r="2"   fill="#daeeff" opacity="0.85"/>
+    <circle cx="1355" cy="72"  r="1.5" fill="#c8dff0" opacity="0.65"/>
+    <circle cx="1445" cy="46"  r="1"   fill="#d0e8f8" opacity="0.6"/>
+    <circle cx="1525" cy="86"  r="1.5" fill="#cce4f8" opacity="0.7"/>
+    <circle cx="1645" cy="33"  r="1"   fill="#c8dff0" opacity="0.75"/>
+    <circle cx="1745" cy="58"  r="2"   fill="#daeeff" opacity="0.65"/>
+    <circle cx="1838" cy="43"  r="1"   fill="#c8dff0" opacity="0.6"/>
+    <circle cx="140"  cy="118" r="1"   fill="#c0d8ee" opacity="0.45"/>
+    <circle cx="415"  cy="138" r="1.5" fill="#cce4f8" opacity="0.6"/>
+    <circle cx="695"  cy="98"  r="1"   fill="#c8dff0" opacity="0.5"/>
+    <circle cx="915"  cy="128" r="1"   fill="#d0e8f8" opacity="0.55"/>
+    <circle cx="1095" cy="108" r="1.5" fill="#cce0f0" opacity="0.65"/>
+    <circle cx="1315" cy="122" r="1"   fill="#c8dff0" opacity="0.45"/>
+    <circle cx="1575" cy="92"  r="1.5" fill="#d0e8f8" opacity="0.6"/>
+    <circle cx="1775" cy="112" r="1"   fill="#c8dff0" opacity="0.55"/>
+    <circle cx="28"   cy="158" r="1.5" fill="#cce4f8" opacity="0.55"/>
+    <circle cx="275"  cy="178" r="1"   fill="#c0d8ee" opacity="0.42"/>
+    <circle cx="545"  cy="152" r="1"   fill="#c8dff0" opacity="0.48"/>
+    <circle cx="795"  cy="168" r="1.5" fill="#d0e8f8" opacity="0.52"/>
+    <circle cx="995"  cy="148" r="1"   fill="#cce0f0" opacity="0.48"/>
+    <circle cx="1195" cy="165" r="1.5" fill="#c8dff0" opacity="0.55"/>
+    <circle cx="1415" cy="145" r="1"   fill="#d0e8f8" opacity="0.42"/>
+    <circle cx="1688" cy="162" r="1.5" fill="#cce4f8" opacity="0.52"/>
+    <circle cx="1888" cy="175" r="1"   fill="#c8dff0" opacity="0.48"/>
+
+    <path d="M 178 830 C 260 808, 340 818, 420 796 C 490 778, 560 790, 630 765 C 700 746, 770 758, 845 730 C 915 710, 980 724, 1040 694 C 1100 672, 1160 686, 1215 655 C 1255 630, 1270 598, 1285 565 C 1295 540, 1298 515, 1302 488 C 1304 472, 1305 458, 1306 440 C 1307 420, 1307 400, 1308 370"
+          fill="none" stroke="#5ab0d8" stroke-width="1.8" stroke-dasharray="8,5" opacity="0.5"/>
+
+    <circle cx="176" cy="832" r="5"  fill="#7ab8d8" opacity="0.95"/>
+    <circle cx="176" cy="832" r="10" fill="none" stroke="#7ab8d8" stroke-width="1.5" opacity="0.35"/>
+    <text x="194" y="856" fill="rgba(180,210,232,0.7)" font-family="'Barlow Condensed','Arial Narrow',sans-serif" font-size="16" letter-spacing="2.5">JIRI, NEPAL &middot; START &middot; 1,905 m</text>
+
+    <circle cx="1308" cy="360" r="5"  fill="#c8e8ff" opacity="1"/>
+    <circle cx="1308" cy="360" r="11" fill="none" stroke="#a8d8f8" stroke-width="1.5" opacity="0.5"/>
+    <circle cx="1308" cy="360" r="19" fill="none" stroke="#88c0e8" stroke-width="0.8" opacity="0.2"/>
+    <text x="1376" y="330" fill="rgba(220,240,255,0.88)" font-family="'Barlow Condensed','Arial Narrow',sans-serif" font-size="19" letter-spacing="3" font-weight="600">MT. EVEREST &middot; SUMMIT</text>
+    <text x="1377" y="349" fill="rgba(160,200,228,0.6)" font-family="'Barlow Condensed','Arial Narrow',sans-serif" font-size="15" letter-spacing="2.5">8,849 m &middot; FINISH</text>
+  </svg>
+
+  <div class="mtn-1"></div>
+  <div class="mtn-2"></div>
+  <div class="everest-ice"></div>
+  <div class="everest-snow"></div>
+  <div class="everest-shimmer"></div>
+  <div class="mtn-3"></div>
+  <div class="snow-caps"></div>
+  <div class="mtn-front"></div>
+  <div class="moon"></div>
+
+  <div class="content-left">
+    <div class="badge">Annual Ultra Marathon &middot; Edition VI &middot; 2026</div>
+    <div class="company-name">Trek Or Treat</div>
+    <div class="title-wrap">
+      <span class="t1">Run For</span>
+      <span class="t1 t1-ice">Your Life</span>
+    </div>
+    <div class="subtitle-race">Himalayan Ultra Marathon</div>
+    <div class="divider"></div>
+    <div class="route-info">
+      <div class="route-dot"></div>
+      <div class="route-label">
+        <strong>Jiri, Nepal</strong>
+        <span>Start &middot; 1,905 m</span>
+      </div>
+      <div class="route-dash"></div>
+      <div class="route-dot end"></div>
+      <div class="route-label">
+        <strong>Mt. Everest Summit</strong>
+        <span>Finish &middot; 8,849 m</span>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat">
+        <span class="stat-num">200</span>
+        <span class="stat-unit">Kilometres</span>
+      </div>
+      <div class="stat-sep"></div>
+      <div class="stat">
+        <span class="stat-num">+14,600</span>
+        <span class="stat-unit">m Elevation Gain</span>
+      </div>
+      <div class="stat-sep"></div>
+      <div class="stat">
+        <span class="stat-num">72</span>
+        <span class="stat-unit">Hr Cut-off</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-right">
+    <div class="info-cards-grid">
+      <div class="info-card">
+        <div class="info-card-label">Date</div>
+        <div class="info-card-value">Oct 31 &ndash; Nov 3</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Terrain</div>
+        <div class="info-card-value">Alpine Trail</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Category</div>
+        <div class="info-card-value">Solo / Relay</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Edition</div>
+        <div class="info-card-value">VI &middot; 2026</div>
+      </div>
+    </div>
+    <div class="reg-btn">Register &middot; trekortreat.net</div>
+  </div>
+
+  <div class="bottom-strip">
+    <div class="strip-item">Trek Or Treat Adventures</div>
+    <div class="strip-dot"></div>
+    <div class="strip-item">Jiri &rarr; Sagarmatha &middot; Nepal</div>
+    <div class="strip-dot"></div>
+    <div class="strip-item">Himalayan Ultra Series</div>
+    <div class="strip-dot"></div>
+    <div class="strip-item">Open to Elite &amp; Amateur Runners</div>
+    <div class="strip-dot"></div>
+    <div class="strip-item">trekortreat.net</div>
+  </div>
+</div>
