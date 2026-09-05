@@ -1,5 +1,10 @@
 {
   "version": "2.0",
+  "http": {
+    "routePrefix": "api",
+    "maxConcurrentRequests": 100,
+    "maxOutstandingRequests": 2000
+  },
   "logging": {
     "applicationInsights": {
       "samplingSettings": {

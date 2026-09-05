@@ -44,9 +44,12 @@ else
 fi
 
 echo "Ensuring key-based Service Bus auth rule on the 'registrations' queue..."
+# Manage (not just Listen+Send) is required for target-based scaling: without it,
+# the scale controller can't read queue length and falls back to slow incremental
+# scaling. See https://learn.microsoft.com/azure/azure-functions/functions-target-based-scaling
 az servicebus queue authorization-rule create \
   -g "$RESOURCE_GROUP" --namespace-name "$SERVICEBUS_NAMESPACE" \
-  --queue-name registrations --name ingest-function --rights Listen Send \
+  --queue-name registrations --name ingest-function --rights Listen Send Manage \
   -o none
 SERVICEBUS_CONNECTION=$(az servicebus queue authorization-rule keys list \
   -g "$RESOURCE_GROUP" --namespace-name "$SERVICEBUS_NAMESPACE" \
