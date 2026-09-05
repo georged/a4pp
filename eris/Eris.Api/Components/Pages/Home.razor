@@ -173,7 +173,10 @@
                             </div>
                             <div class="queue-meta-row">
                                 <span>Draining Rate</span>
-                                <strong>@panel.DrainRateDisplay</strong>
+                                <span class="queue-meta-value-group">
+                                    <strong>@panel.DrainRateDisplay</strong>
+                                    <button type="button" class="icon-button icon-button-inline" title="Reset draining rate" @onclick="() => ResetDrainRate(panel)">&#x21bb;</button>
+                                </span>
                             </div>
                             <div class="queue-trend @panel.TrendClass">
                                 <span>@panel.TrendLabel</span>
@@ -282,6 +285,11 @@
             Delta = 0;
             FrozenGaugeMax = null;
             LastPollAtUtc = null;
+            ResetDrainRate();
+        }
+
+        public void ResetDrainRate()
+        {
             DrainedMessages = 0;
             DrainSeconds = 0;
         }
@@ -353,6 +361,12 @@
     {
         queuePanels.RemoveAll(p => p.Id == id);
         await SaveQueuePanelsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ResetDrainRate(QueueMonitorPanel panel)
+    {
+        panel.ResetDrainRate();
         await InvokeAsync(StateHasChanged);
     }
 

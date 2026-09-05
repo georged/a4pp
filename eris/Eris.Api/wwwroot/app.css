@@ -308,10 +308,23 @@ button {
 .queue-meta-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 10px;
     font-size: 13px;
+}
+
+.queue-meta-value-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.icon-button-inline {
+    padding: 0 5px;
+    font-size: 12px;
+    line-height: 1.6;
 }
 
 .queue-trend {
