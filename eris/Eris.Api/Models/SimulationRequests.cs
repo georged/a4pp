@@ -28,6 +28,7 @@ public class SimulationProgress
     public int Failed { get; set; }
     public double FailureRate { get; set; }
     public bool IsRunning { get; set; }
+    public bool IsPaused { get; set; }
     public string Scenario { get; set; } = string.Empty;
 }
 

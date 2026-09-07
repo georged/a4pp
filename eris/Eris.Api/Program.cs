@@ -75,6 +75,9 @@ app.UseStaticFiles();
 app.UseAntiforgery();
 
 app.MapDefaultEndpoints();
+// MapDefaultEndpoints() only wires /health up in Development (see Eris.ServiceDefaults);
+// container platforms like Azure Container Apps need it in Production too for liveness/readiness probes.
+app.MapGet("/health", () => Results.Ok("healthy"));
 app.MapHub<SimulationHub>("/hubs/simulation");
 app.MapRazorComponents<App>()
 	.AddInteractiveServerRenderMode();
@@ -278,6 +281,34 @@ app.MapGet("/api/simulations/{runId:guid}", async (HttpContext httpContext, Guid
 		FailureRate = failureRate
 	});
 });
+
+async Task<IResult> WithOwnedRunAsync(HttpContext httpContext, Guid runId, IDbContextFactory<ErisDbContext> dbFactory, CancellationToken ct, Func<Task<IResult>> action)
+{
+	var studentKey = ResolveStudentKey(httpContext);
+	await using var db = await dbFactory.CreateDbContextAsync(ct);
+	var run = await db.SimulationRuns.FirstOrDefaultAsync(x => x.Id == runId, ct);
+	if (run is null)
+	{
+		return Results.NotFound();
+	}
+
+	var owned = await db.Registrations.AnyAsync(x => x.Id == run.RegistrationEndpointId && x.OwnerKey == studentKey, ct);
+	if (!owned)
+	{
+		return Results.NotFound();
+	}
+
+	return await action();
+}
+
+app.MapPost("/api/simulations/{runId:guid}/pause", (HttpContext httpContext, Guid runId, IDbContextFactory<ErisDbContext> dbFactory, ScenarioRunner runner, CancellationToken ct) =>
+	WithOwnedRunAsync(httpContext, runId, dbFactory, ct, () => Task.FromResult(runner.TryPause(runId) ? Results.NoContent() : Results.NotFound())));
+
+app.MapPost("/api/simulations/{runId:guid}/resume", (HttpContext httpContext, Guid runId, IDbContextFactory<ErisDbContext> dbFactory, ScenarioRunner runner, CancellationToken ct) =>
+	WithOwnedRunAsync(httpContext, runId, dbFactory, ct, () => Task.FromResult(runner.TryResume(runId) ? Results.NoContent() : Results.NotFound())));
+
+app.MapPost("/api/simulations/{runId:guid}/cancel", (HttpContext httpContext, Guid runId, IDbContextFactory<ErisDbContext> dbFactory, ScenarioRunner runner, CancellationToken ct) =>
+	WithOwnedRunAsync(httpContext, runId, dbFactory, ct, () => Task.FromResult(runner.TryCancel(runId) ? Results.NoContent() : Results.NotFound())));
 
 app.MapGet("/api/registrations/{id:guid}/history", async (HttpContext httpContext, Guid id, IDbContextFactory<ErisDbContext> dbFactory, CancellationToken ct) =>
 {

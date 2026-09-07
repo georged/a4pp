@@ -91,8 +91,19 @@
             <div class="run-indicator" role="status" aria-live="polite">
                 <span class="run-spinner" aria-hidden="true"></span>
                 <div>
-                    <strong>Sending in progress...</strong>
+                    <strong>@(isPaused ? "Paused" : "Sending in progress...")</strong>
                     <div class="muted">Processed @ProcessedCount of @plannedRequestCount, pending @PendingCount. Elapsed @ElapsedText.</div>
+                </div>
+                <div style="margin-left:auto;display:flex;gap:8px;">
+                    @if (isPaused)
+                    {
+                        <button type="button" @onclick="ResumeSimulationAsync">Resume</button>
+                    }
+                    else
+                    {
+                        <button type="button" @onclick="PauseSimulationAsync">Pause</button>
+                    }
+                    <button type="button" style="background:#b21f35;" @onclick="CancelSimulationAsync">Cancel</button>
                 </div>
             </div>
         }
@@ -242,6 +253,8 @@
     private SimulationProgress progress = new();
     private HubConnection? hubConnection;
     private bool isRunning;
+    private bool isPaused;
+    private Guid? activeRunId;
     private string studentKey = string.Empty;
     private bool initialized;
     private bool showAddValidation;
@@ -516,6 +529,8 @@
     private async Task ConnectSimulationAsync(Guid runId)
     {
         isRunning = true;
+        isPaused = false;
+        activeRunId = runId;
         progress = new SimulationProgress();
         runStartedAtUtc = DateTime.UtcNow;
         StartStatusTicker();
@@ -535,6 +550,7 @@
         {
             progress = value;
             isRunning = value.IsRunning;
+            isPaused = value.IsPaused;
             if (!isRunning)
             {
                 StopStatusTicker();
@@ -545,6 +561,8 @@
         hubConnection.On<Dictionary<string, object>>("completed", _ =>
         {
             isRunning = false;
+            isPaused = false;
+            activeRunId = null;
             StopStatusTicker();
             var historyTask = LoadHistoryAsync();
             InvokeAsync(StateHasChanged);
@@ -552,6 +570,42 @@
 
         await hubConnection.StartAsync();
         await hubConnection.InvokeAsync("JoinSimulation", runId.ToString());
+    }
+
+    private async Task PauseSimulationAsync()
+    {
+        if (activeRunId is not { } runId)
+        {
+            return;
+        }
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/simulations/{runId}/pause");
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+        await Http.SendAsync(requestMessage);
+    }
+
+    private async Task ResumeSimulationAsync()
+    {
+        if (activeRunId is not { } runId)
+        {
+            return;
+        }
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/simulations/{runId}/resume");
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+        await Http.SendAsync(requestMessage);
+    }
+
+    private async Task CancelSimulationAsync()
+    {
+        if (activeRunId is not { } runId)
+        {
+            return;
+        }
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/simulations/{runId}/cancel");
+        requestMessage.Headers.Add("X-Eris-Student-Key", studentKey);
+        await Http.SendAsync(requestMessage);
     }
 
     private async Task LoadHistoryAsync()
