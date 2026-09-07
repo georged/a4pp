@@ -30,12 +30,14 @@ module.exports = async function (context, messages) {
     const env = process.env.DATAVERSE_ENVIRONMENT_URL;
     const accessToken = await getAccessToken(env);
 
-    // One changeset containing a deep insert (contact + linked tot_registration) per message,
-    // sent to Dataverse's OData $batch endpoint as a single HTTP request.
+    // No changeset: each message is a deep insert (contact + linked tot_registration) sent as
+    // a single write operation, so there's nothing within a message that needs transactional
+    // grouping. Plain batch parts plus Prefer: odata.continue-on-error give per-message
+    // independence — one bad message fails alone and doesn't stop the rest of the batch
+    // (without that header, Dataverse stops processing the batch at the first failure).
     const batchBoundary = `batch_${crypto.randomUUID()}`;
-    const changesetBoundary = `changeset_${crypto.randomUUID()}`;
 
-    const changesetParts = batch.map((data, i) => {
+    const requestParts = batch.map((data, i) => {
         const body = {
             firstname: data.customer.firstName,
             lastname: data.customer.lastName,
@@ -53,7 +55,7 @@ module.exports = async function (context, messages) {
                 }
             ]
         };
-        return `--${changesetBoundary}\r\n` +
+        return `--${batchBoundary}\r\n` +
             `Content-Type: application/http\r\n` +
             `Content-Transfer-Encoding: binary\r\n` +
             `Content-ID: ${i + 1}\r\n\r\n` +
@@ -62,17 +64,14 @@ module.exports = async function (context, messages) {
             `${JSON.stringify(body)}\r\n`;
     }).join("");
 
-    const batchBody = `--${batchBoundary}\r\n` +
-        `Content-Type: multipart/mixed;boundary=${changesetBoundary}\r\n\r\n` +
-        changesetParts +
-        `--${changesetBoundary}--\r\n` +
-        `--${batchBoundary}--\r\n`;
+    const batchBody = requestParts + `--${batchBoundary}--\r\n`;
 
     const batchHeaders = {
         "Authorization": `Bearer ${accessToken}`,
         "Content-Type": `multipart/mixed;boundary=${batchBoundary}`,
         "OData-MaxVersion": "4.0",
-        "OData-Version": "4.0"
+        "OData-Version": "4.0",
+        "Prefer": "odata.continue-on-error"
     };
 
     let res = await fetch(`${env}/api/data/v9.2/$batch`, { method: "POST", headers: batchHeaders, body: batchBody });
