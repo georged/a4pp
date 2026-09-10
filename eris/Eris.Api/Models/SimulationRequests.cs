@@ -18,6 +18,7 @@ public class StartSimulationRequest
     public int MaxConcurrency { get; set; } = 10;
     public int ValidCount { get; set; } = 10;
     public int DuplicateCount { get; set; } = 0;
+    public string? EmailOverride { get; set; }
 }
 
 public class SimulationProgress

@@ -155,7 +155,7 @@ public class ScenarioRunner(
 
         if (scenario == "single-valid")
         {
-            items.Add(new SimulationItem(eventGenerator.GenerateValidJson(), false));
+            items.Add(new SimulationItem(eventGenerator.GenerateValidJson(request.EmailOverride), false));
             return items;
         }
 
@@ -163,7 +163,7 @@ public class ScenarioRunner(
         {
             for (var i = 0; i < Math.Max(1, request.Count); i++)
             {
-                items.Add(new SimulationItem(eventGenerator.GenerateValidJson(), false));
+                items.Add(new SimulationItem(eventGenerator.GenerateValidJson(request.EmailOverride), false));
             }
 
             return items;
@@ -171,7 +171,7 @@ public class ScenarioRunner(
 
         if (scenario == "duplicates")
         {
-            var duplicatePayload = eventGenerator.GenerateValidJson();
+            var duplicatePayload = eventGenerator.GenerateValidJson(request.EmailOverride);
             for (var i = 0; i < Math.Max(1, request.Count); i++)
             {
                 items.Add(new SimulationItem(duplicatePayload, true));
@@ -184,10 +184,10 @@ public class ScenarioRunner(
         {
             for (var i = 0; i < Math.Max(0, request.ValidCount); i++)
             {
-                items.Add(new SimulationItem(eventGenerator.GenerateValidJson(), false));
+                items.Add(new SimulationItem(eventGenerator.GenerateValidJson(request.EmailOverride), false));
             }
 
-            var duplicatePayload = eventGenerator.GenerateValidJson();
+            var duplicatePayload = eventGenerator.GenerateValidJson(request.EmailOverride);
             for (var i = 0; i < Math.Max(0, request.DuplicateCount); i++)
             {
                 items.Add(new SimulationItem(duplicatePayload, true));

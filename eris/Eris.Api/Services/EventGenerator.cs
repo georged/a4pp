@@ -16,7 +16,7 @@ public class EventGenerator
     private string NextEventId() => $"evt-{Interlocked.Increment(ref _sequence):D8}";
     private string NextRegistrationId() => $"reg-{Interlocked.Increment(ref _sequence):D8}";
 
-    public string GenerateValidJson()
+    public string GenerateValidJson(string? emailOverride = null)
     {
         lock (_sync)
         {
@@ -34,7 +34,7 @@ public class EventGenerator
                 {
                     FirstName = _faker.Name.FirstName(),
                     LastName = _faker.Name.LastName(),
-                    Email = _faker.Internet.Email()
+                    Email = string.IsNullOrWhiteSpace(emailOverride) ? _faker.Internet.Email() : emailOverride.Trim()
                 },
                 CampaignCode = _faker.PickRandom("BLACKFRIDAY", "SPRING", "SUMMER", "VIP2026"),
                 TicketType = _faker.PickRandom("General", "VIP", "EarlyBird"),

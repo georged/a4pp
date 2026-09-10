@@ -81,6 +81,11 @@
             <div class="field"><label>Concurrency</label><input type="number" min="1" max="100" @bind="request.MaxConcurrency" /></div>
             <div class="field"><label>Total</label><input type="number" value="@TotalToSend" readonly /></div>
         </div>
+        <div class="field">
+            <label>Override email (optional)</label>
+            <input type="email" @bind="request.EmailOverride"
+                   placeholder="Leave blank for random fake addresses" style="width:100%" />
+        </div>
         <button type="button" @onclick="StartSimulationAsync" disabled="@(!CanSend)">Send Data</button>
     </section>
 
