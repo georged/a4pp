@@ -8,5 +8,7 @@
     "build": "echo \"No build step required for JavaScript\"",
     "lint": "echo \"No lint step configured\""
   },
-  "dependencies": {}
+  "dependencies": {
+    "durable-functions": "^2.1.4"
+  }
 }

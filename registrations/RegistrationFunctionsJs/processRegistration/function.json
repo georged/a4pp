@@ -7,6 +7,11 @@
       "queueName": "registrations",
       "connection": "ServiceBusConnection",
       "cardinality": "many"
+    },
+    {
+      "name": "starter",
+      "type": "durableClient",
+      "direction": "in"
     }
   ]
 }

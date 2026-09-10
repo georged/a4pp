@@ -3,11 +3,17 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "node",
-    "WEBSITE_NODE_DEFAULT_VERSION": "~24",
+    "WEBSITE_NODE_DEFAULT_VERSION": "~22",
     "ServiceBusConnection": "Endpoint=sb://<your-servicebus-namespace>.servicebus.windows.net/;SharedAccessKeyName=<key-name>;SharedAccessKey=<key>;EntityPath=registrations",
     "DATAVERSE_ENVIRONMENT_URL": "https://trek-dev.crm6.dynamics.com",
     "DATAVERSE_TENANT_ID": "<tenant-id>",
     "DATAVERSE_CLIENT_ID": "<app-registration-client-id>",
-    "DATAVERSE_CLIENT_SECRET": "<app-registration-client-secret>"
+    "DATAVERSE_CLIENT_SECRET": "<app-registration-client-secret>",
+    "REAL_DEMO_EMAILS": "",
+    "FUNCTION_APP_BASE_URL": "http://localhost:7071",
+    "CONFIRMATION_EMAIL_FROM": "<dataverse-user-or-queue-email>",
+    "CONFIRMATION_EXPIRY_MINUTES": "15",
+    "SIMULATED_CONFIRM_DELAY_MIN_SECONDS": "15",
+    "SIMULATED_CONFIRM_DELAY_MAX_SECONDS": "90"
   }
 }

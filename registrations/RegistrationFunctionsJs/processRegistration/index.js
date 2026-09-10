@@ -1,59 +1,63 @@
 const crypto = require("crypto");
+const df = require("durable-functions");
+const { dataverseFetch } = require("../shared/dataverseClient");
 
-let cachedToken = null;
-let cachedTokenExpiresAt = 0;
+function parseAllowlist() {
+    return (process.env.REAL_DEMO_EMAILS || "")
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+}
 
-async function getAccessToken(env) {
-    if (cachedToken && Date.now() < cachedTokenExpiresAt) {
-        return cachedToken;
-    }
-    const tokenRes = await fetch(`https://login.microsoftonline.com/${process.env.DATAVERSE_TENANT_ID}/oauth2/v2.0/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            grant_type: "client_credentials",
-            client_id: process.env.DATAVERSE_CLIENT_ID,
-            client_secret: process.env.DATAVERSE_CLIENT_SECRET,
-            scope: `${env}/.default`
-        })
+function isAllowlistedEmail(email, allowlist) {
+    const normalizedEmail = (email || "").trim().toLowerCase();
+
+    return allowlist.some((entry) => {
+        if (entry.startsWith("@")) {
+            return normalizedEmail.endsWith(entry);
+        }
+
+        return normalizedEmail === entry;
     });
-    const { access_token, expires_in } = await tokenRes.json();
-    cachedToken = access_token;
-    cachedTokenExpiresAt = Date.now() + (expires_in - 60) * 1000;
-    return cachedToken;
+}
+
+// Dataverse returns batch parts in request order for a plain (non-changeset) batch, so the
+// part at index i corresponds to items[i]. Each part's own HTTP status line tells us whether
+// that specific contact create succeeded, which continue-on-error makes independent of the
+// others.
+function parsePartStatuses(responseText, boundary) {
+    return responseText
+        .split(`--${boundary}`)
+        .filter((part) => part.trim() && part.trim() !== "--")
+        .map((part) => {
+            const statusMatch = part.match(/HTTP\/1\.1 (\d+)/);
+            return statusMatch ? Number(statusMatch[1]) : 0;
+        });
 }
 
 module.exports = async function (context, messages) {
     const batch = messages.map((m) => (typeof m === "string" ? JSON.parse(m) : m));
     context.log(`Processing a batch of ${batch.length} registrations`);
 
-    const env = process.env.DATAVERSE_ENVIRONMENT_URL;
-    const accessToken = await getAccessToken(env);
+    const allowlist = parseAllowlist();
+    const items = batch.map((data) => ({
+        contactId: crypto.randomUUID(),
+        data,
+        isRealEmail: isAllowlistedEmail(data.customer.email, allowlist)
+    }));
 
-    // No changeset: each message is a deep insert (contact + linked tot_registration) sent as
-    // a single write operation, so there's nothing within a message that needs transactional
-    // grouping. Plain batch parts plus Prefer: odata.continue-on-error give per-message
-    // independence — one bad message fails alone and doesn't stop the rest of the batch
-    // (without that header, Dataverse stops processing the batch at the first failure).
+    // Only the contact is written here. The tot_registration record is created later by
+    // createRegistrationActivity, once the orchestration confirms the email address - deep
+    // insert isn't used any more since contact and registration are no longer created together.
+    const env = process.env.DATAVERSE_ENVIRONMENT_URL;
     const batchBoundary = `batch_${crypto.randomUUID()}`;
 
-    const requestParts = batch.map((data, i) => {
+    const requestParts = items.map((item, i) => {
         const body = {
-            firstname: data.customer.firstName,
-            lastname: data.customer.lastName,
-            emailaddress1: data.customer.email,
-            tot_registration_contact: [
-                {
-                    tot_externalid: data.registrationId,
-                    tot_campaigncode: data.campaignCode,
-                    tot_eventid: data.eventId,
-                    tot_quantity: data.quantity,
-                    tot_sourcesystem: data.sourceSystem,
-                    tot_submittedon: data.eventTime,
-                    tot_tickettype: data.ticketType,
-                    tot_totalamount: data.totalAmount
-                }
-            ]
+            contactid: item.contactId,
+            firstname: item.data.customer.firstName,
+            lastname: item.data.customer.lastName,
+            emailaddress1: item.data.customer.email
         };
         return `--${batchBoundary}\r\n` +
             `Content-Type: application/http\r\n` +
@@ -66,21 +70,49 @@ module.exports = async function (context, messages) {
 
     const batchBody = requestParts + `--${batchBoundary}--\r\n`;
 
-    const batchHeaders = {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": `multipart/mixed;boundary=${batchBoundary}`,
-        "OData-MaxVersion": "4.0",
-        "OData-Version": "4.0",
-        "Prefer": "odata.continue-on-error"
-    };
+    const res = await dataverseFetch("$batch", {
+        method: "POST",
+        headers: {
+            "Content-Type": `multipart/mixed;boundary=${batchBoundary}`,
+            "Prefer": "odata.continue-on-error"
+        },
+        body: batchBody
+    });
 
-    let res = await fetch(`${env}/api/data/v9.2/$batch`, { method: "POST", headers: batchHeaders, body: batchBody });
-    while (res.status === 429) {
-        const waitSeconds = Number(res.headers.get("Retry-After")) || 5;
-        context.log(`Throttled by Dataverse, retrying batch in ${waitSeconds}s`);
-        await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000));
-        res = await fetch(`${env}/api/data/v9.2/$batch`, { method: "POST", headers: batchHeaders, body: batchBody });
+    const responseText = await res.text();
+    const contentType = res.headers.get("content-type") || "";
+    const responseBoundary = (contentType.match(/boundary=([^;]+)/) || [])[1];
+    const statuses = responseBoundary ? parsePartStatuses(responseText, responseBoundary) : [];
+
+    context.log(`Batch of ${items.length} contacts completed with status ${res.status}`);
+
+    const client = df.getClient(context);
+    let started = 0;
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const partStatus = statuses[i];
+        if (!(partStatus >= 200 && partStatus < 300)) {
+            context.log.error(`Contact create failed for registration ${item.data.registrationId} (status ${partStatus})`);
+            continue;
+        }
+
+        await client.startNew("registrationOrchestrator", item.contactId, {
+            contactId: item.contactId,
+            email: item.data.customer.email,
+            isRealEmail: item.isRealEmail,
+            registration: {
+                externalId: item.data.registrationId,
+                campaignCode: item.data.campaignCode,
+                eventId: item.data.eventId,
+                quantity: item.data.quantity,
+                sourceSystem: item.data.sourceSystem,
+                submittedOn: item.data.eventTime,
+                ticketType: item.data.ticketType,
+                totalAmount: item.data.totalAmount
+            }
+        });
+        started++;
     }
 
-    context.log(`Batch of ${batch.length} registrations completed with status ${res.status}`);
+    context.log(`Started ${started} registration orchestrations`);
 };

@@ -27,12 +27,16 @@ echo "Postprovision: ensuring Windows Consumption Function App '$FUNCTION_APP_NA
 if az functionapp show -g "$RESOURCE_GROUP" -n "$FUNCTION_APP_NAME" >/dev/null 2>&1; then
   echo "Function App '$FUNCTION_APP_NAME' already exists — skipping create."
 else
+  # Node 22, not 24: durable-functions 2.1.4 (the last version with the classic,
+  # function.json-triggered orchestrator API this app uses) calls the Node core
+  # util.isDate() in its createTimer action, which Node 24 removed outright -
+  # every orchestrator that calls context.df.createTimer throws on Node 24.
   az functionapp create \
     --resource-group "$RESOURCE_GROUP" \
     --name "$FUNCTION_APP_NAME" \
     --consumption-plan-location "$LOCATION" \
     --runtime node \
-    --runtime-version 24 \
+    --runtime-version 22 \
     --functions-version 4 \
     --storage-account "$STORAGE_ACCOUNT" \
     --app-insights "$APPINSIGHTS_NAME" \
