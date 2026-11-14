@@ -13,3 +13,11 @@ build/
 .env
 .DS_Store
 .playwright-mcp
+.vscode
+local.settings.json
+# Azurite (local storage emulator)
+__blobstorage__/
+__queuestorage__/
+__tablestorage__/
+__azurite_db*__.json
+azurite_debug.log

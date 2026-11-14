@@ -1,0 +1,19 @@
+POST http://localhost:7071/api/ingestRegistration
+Content-Type: application/json
+
+{
+  "eventId": "evt-00000026",
+  "eventType": "registration.created",
+  "eventTime": "2026-12-23T01:30:12.391805+00:00",
+  "sourceSystem": "contoso-web",
+  "registrationId": "reg-00000027",
+  "customer": {
+    "firstName": "Evert",
+    "lastName": "Weissnat",
+    "email": "evert.weissnat@example.com"
+  },
+  "campaignCode": "VIP2026",
+  "ticketType": "VIP",
+  "quantity": 2,
+  "totalAmount": 288.69
+}

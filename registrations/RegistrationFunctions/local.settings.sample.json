@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "ServiceBusConnection": "Endpoint=sb://<your-namespace>.servicebus.windows.net/;SharedAccessKeyName=<rule-name>;SharedAccessKey=<key>",
+    "DataverseConnection": "AuthType=ClientSecret;Url=https://<your-org>.crm6.dynamics.com;ClientId=<app-registration-client-id>;ClientSecret=<app-registration-client-secret>"
+  }
+}

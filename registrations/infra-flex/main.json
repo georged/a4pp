@@ -1,0 +1,290 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.49.2.45890",
+      "templateHash": "16733035109627581685"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Region for every resource. Australia East keeps the app next to Dataverse (crm6)."
+      }
+    },
+    "useManagedIdentity": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "false = connection strings (starting state). true = managed identity (end state)."
+      }
+    },
+    "queueName": {
+      "type": "string",
+      "defaultValue": "registrations-flex",
+      "metadata": {
+        "description": "Queue the functions read from and write to. Must match Queues.cs."
+      }
+    }
+  },
+  "variables": {
+    "token": "[toLower(uniqueString(resourceGroup().id))]",
+    "tags": {
+      "course": "azure-for-power-platform",
+      "module": "m3"
+    },
+    "deploymentContainerName": "app-package",
+    "storageBlobDataOwner": "b7e6dc6d-f1e8-4753-8033-0f276bb0955b",
+    "serviceBusDataSender": "69a216fc-b8fb-44d8-bc22-1f3c2cd27a39",
+    "serviceBusDataReceiver": "4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0",
+    "identitySettings": [
+      {
+        "name": "AzureWebJobsStorage__accountName",
+        "value": "[format('stflex{0}', variables('token'))]"
+      },
+      {
+        "name": "ServiceBusConnection__fullyQualifiedNamespace",
+        "value": "[format('{0}.servicebus.windows.net', format('sb-flex-{0}', variables('token')))]"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[format('stflex{0}', variables('token'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": true
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}', format('stflex{0}', variables('token')), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}/{2}', format('stflex{0}', variables('token')), 'default', variables('deploymentContainerName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('stflex{0}', variables('token')), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('log-flex-{0}', variables('token'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[format('appi-flex-{0}', variables('token'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format('log-flex-{0}', variables('token')))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('log-flex-{0}', variables('token')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces",
+      "apiVersion": "2022-10-01-preview",
+      "name": "[format('sb-flex-{0}', variables('token'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Standard"
+      }
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/queues",
+      "apiVersion": "2022-10-01-preview",
+      "name": "[format('{0}/{1}', format('sb-flex-{0}', variables('token')), parameters('queueName'))]",
+      "properties": {
+        "maxDeliveryCount": 10,
+        "deadLetteringOnMessageExpiration": true,
+        "defaultMessageTimeToLive": "P14D",
+        "lockDuration": "PT5M"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token')))]"
+      ]
+    },
+    {
+      "condition": "[not(parameters('useManagedIdentity'))]",
+      "type": "Microsoft.ServiceBus/namespaces/AuthorizationRules",
+      "apiVersion": "2022-10-01-preview",
+      "name": "[format('{0}/{1}', format('sb-flex-{0}', variables('token')), 'functions')]",
+      "properties": {
+        "rights": [
+          "Listen",
+          "Send",
+          "Manage"
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "name": "[format('plan-flex-{0}', variables('token'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "kind": "functionapp",
+      "sku": {
+        "tier": "FlexConsumption",
+        "name": "FC1"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[format('func-registrations-flex-{0}', variables('token'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "kind": "functionapp,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('plan-flex-{0}', variables('token')))]",
+        "httpsOnly": true,
+        "functionAppConfig": {
+          "deployment": {
+            "storage": {
+              "type": "blobContainer",
+              "value": "[format('{0}{1}', reference(resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token'))), '2023-05-01').primaryEndpoints.blob, variables('deploymentContainerName'))]",
+              "authentication": "[if(parameters('useManagedIdentity'), createObject('type', 'SystemAssignedIdentity'), createObject('type', 'StorageAccountConnectionString', 'storageAccountConnectionStringName', 'DEPLOYMENT_STORAGE_CONNECTION_STRING'))]"
+            }
+          },
+          "runtime": {
+            "name": "dotnet-isolated",
+            "version": "10.0"
+          },
+          "scaleAndConcurrency": {
+            "maximumInstanceCount": 100,
+            "instanceMemoryMB": 2048
+          }
+        },
+        "siteConfig": {
+          "appSettings": "[concat(createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', reference(resourceId('Microsoft.Insights/components', format('appi-flex-{0}', variables('token'))), '2020-02-02').ConnectionString)), if(parameters('useManagedIdentity'), variables('identitySettings'), createArray(createObject('name', 'AzureWebJobsStorage', 'value', format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', format('stflex{0}', variables('token')), listKeys(resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token'))), '2023-05-01').keys[0].value, environment().suffixes.storage)), createObject('name', 'DEPLOYMENT_STORAGE_CONNECTION_STRING', 'value', format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', format('stflex{0}', variables('token')), listKeys(resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token'))), '2023-05-01').keys[0].value, environment().suffixes.storage)), createObject('name', 'ServiceBusConnection', 'value', if(parameters('useManagedIdentity'), '', listKeys(resourceId('Microsoft.ServiceBus/namespaces/AuthorizationRules', format('sb-flex-{0}', variables('token')), 'functions'), '2022-10-01-preview').primaryConnectionString)))))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', format('appi-flex-{0}', variables('token')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', format('stflex{0}', variables('token')), 'default', variables('deploymentContainerName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', format('plan-flex-{0}', variables('token')))]",
+        "[resourceId('Microsoft.ServiceBus/namespaces/AuthorizationRules', format('sb-flex-{0}', variables('token')), 'functions')]",
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token')))]"
+      ]
+    },
+    {
+      "condition": "[parameters('useManagedIdentity')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token')))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token'))), resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), variables('storageBlobDataOwner'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageBlobDataOwner'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', format('stflex{0}', variables('token')))]"
+      ]
+    },
+    {
+      "condition": "[parameters('useManagedIdentity')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token')))]",
+      "name": "[guid(resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token'))), resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), variables('serviceBusDataSender'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('serviceBusDataSender'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token')))]",
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token')))]"
+      ]
+    },
+    {
+      "condition": "[parameters('useManagedIdentity')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token')))]",
+      "name": "[guid(resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token'))), resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), variables('serviceBusDataReceiver'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('serviceBusDataReceiver'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token')))]",
+        "[resourceId('Microsoft.ServiceBus/namespaces', format('sb-flex-{0}', variables('token')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "functionAppName": {
+      "type": "string",
+      "value": "[format('func-registrations-flex-{0}', variables('token'))]"
+    },
+    "functionAppUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), '2024-04-01').defaultHostName)]"
+    },
+    "serviceBusNamespace": {
+      "type": "string",
+      "value": "[format('sb-flex-{0}', variables('token'))]"
+    },
+    "queueName": {
+      "type": "string",
+      "value": "[parameters('queueName')]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[format('stflex{0}', variables('token'))]"
+    },
+    "managedIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', format('func-registrations-flex-{0}', variables('token'))), '2024-04-01', 'full').identity.principalId]"
+    }
+  }
+}
